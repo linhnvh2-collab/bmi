@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
   Database,
   Heart,
+  Layers,
   RefreshCw,
   Scale,
   Upload,
@@ -23,20 +24,36 @@ import { fetchFoods } from '@/src/lib/firebase/foodsService';
 import {
   filterByAllergens,
   MAX_COMPARE_FOODS,
+  NUTRIENT_NEED_GROUP_MAP,
   searchFoods,
 } from '@/src/lib/nutrition';
 import type {
   FoodCategory,
   FoodItem,
+  NutrientNeedGroupId,
   VerificationStatus,
 } from '@/src/types/food';
-import { CompareTable, FilterBar, FoodCard } from './components';
+import {
+  CompareTable,
+  FilterBar,
+  FoodCard,
+  type EnergyRangeFilter,
+  type ProteinRangeFilter,
+} from './components';
 
 type PageTab = 'catalog' | 'favorites' | 'compare';
 const PAGE_SIZE = 12;
 
 export function FoodsPage() {
   const { user, isAdmin, profile, favoriteIds, toggleFavorite } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const initialGroupParam = searchParams.get('group');
+  const initialGroup: NutrientNeedGroupId | 'all' =
+    initialGroupParam &&
+    NUTRIENT_NEED_GROUP_MAP.has(initialGroupParam as NutrientNeedGroupId)
+      ? (initialGroupParam as NutrientNeedGroupId)
+      : 'all';
 
   const [foods, setFoods] = useState<FoodItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,15 +63,32 @@ export function FoodsPage() {
   const [activeTab, setActiveTab] = useState<PageTab>('catalog');
   const [searchQuery, setSearchQuery] = useState('');
   const [category, setCategory] = useState<FoodCategory | 'all'>('all');
+  const [nutrientGroup, setNutrientGroup] = useState<NutrientNeedGroupId | 'all'>(
+    initialGroup
+  );
+  const [energyRange, setEnergyRange] = useState<EnergyRangeFilter>('all');
+  const [proteinRange, setProteinRange] = useState<ProteinRangeFilter>('all');
   const [excludedAllergen, setExcludedAllergen] = useState('');
   const [dietTag, setDietTag] = useState('all');
   const [verificationFilter, setVerificationFilter] = useState<
     VerificationStatus | 'all'
   >('all');
-  const [includeUnverified, setIncludeUnverified] = useState(false);
+  // Default true so curated reference catalog dishes (marked 'estimated') are immediately visible with clear badges
+  const [includeUnverified, setIncludeUnverified] = useState(true);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const [compareIds, setCompareIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    const param = searchParams.get('group');
+    if (
+      param &&
+      NUTRIENT_NEED_GROUP_MAP.has(param as NutrientNeedGroupId)
+    ) {
+      setNutrientGroup(param as NutrientNeedGroupId);
+      setActiveTab('catalog');
+    }
+  }, [searchParams]);
 
   const loadFoods = useCallback(async (forceRefresh = false) => {
     setLoading(true);
@@ -81,6 +115,9 @@ export function FoodsPage() {
   const filteredFoods = useMemo(() => {
     return searchFoods(foods, searchQuery, {
       category,
+      nutrientGroup,
+      energyRange,
+      proteinRange,
       excludedAllergens: excludedAllergen ? [excludedAllergen] : [],
       dietTag,
       verificationStatus: includeUnverified ? verificationFilter : 'verified',
@@ -91,6 +128,9 @@ export function FoodsPage() {
     foods,
     searchQuery,
     category,
+    nutrientGroup,
+    energyRange,
+    proteinRange,
     excludedAllergen,
     dietTag,
     verificationFilter,
@@ -139,11 +179,17 @@ export function FoodsPage() {
   const handleResetFilters = () => {
     setSearchQuery('');
     setCategory('all');
+    setNutrientGroup('all');
+    setEnergyRange('all');
+    setProteinRange('all');
     setExcludedAllergen('');
     setDietTag('all');
     setVerificationFilter('all');
-    setIncludeUnverified(false);
+    setIncludeUnverified(true);
     setVisibleCount(PAGE_SIZE);
+    if (searchParams.has('group')) {
+      setSearchParams({});
+    }
   };
 
   const tabItems: Array<{ value: PageTab; label: string }> = [
@@ -159,6 +205,8 @@ export function FoodsPage() {
 
   const displayedFoods = filteredFoods.slice(0, visibleCount);
   const hasMore = displayedFoods.length < filteredFoods.length;
+  const activeGroupMeta =
+    nutrientGroup !== 'all' ? NUTRIENT_NEED_GROUP_MAP.get(nutrientGroup) : null;
 
   return (
     <div className="space-y-6">
@@ -169,12 +217,21 @@ export function FoodsPage() {
             Kho dữ liệu thực phẩm Việt Nam
           </h1>
           <p className="text-sm text-slate-600">
-            Tra cứu giá trị dinh dưỡng theo 100g, kiểm tra thông tin dị ứng và so sánh
-            khẩu phần. Mặc định chỉ hiển thị dữ liệu đã xác minh nguồn.
+            Tra cứu dinh dưỡng theo 100g, lọc theo nhóm chất, kiểm tra thông tin dị
+            ứng và so sánh khẩu phần món ăn Việt Nam.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          <Link to="/nutrients">
+            <Button
+              variant="secondary"
+              size="sm"
+              leftIcon={<Layers className="h-3.5 w-3.5" aria-hidden="true" />}
+            >
+              9 nhóm nhu cầu dinh dưỡng
+            </Button>
+          </Link>
           <Button
             variant="outline"
             size="sm"
@@ -200,11 +257,7 @@ export function FoodsPage() {
 
       {/* Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Tabs
-          value={activeTab}
-          onChange={setActiveTab}
-          items={tabItems}
-        />
+        <Tabs value={activeTab} onChange={setActiveTab} items={tabItems} />
 
         {compareFoods.length >= 2 && activeTab !== 'compare' && (
           <Button
@@ -235,6 +288,24 @@ export function FoodsPage() {
               setCategory(val);
               setVisibleCount(PAGE_SIZE);
             }}
+            nutrientGroup={nutrientGroup}
+            onNutrientGroupChange={(val) => {
+              setNutrientGroup(val);
+              setVisibleCount(PAGE_SIZE);
+              if (val === 'all' && searchParams.has('group')) {
+                setSearchParams({});
+              }
+            }}
+            energyRange={energyRange}
+            onEnergyRangeChange={(val) => {
+              setEnergyRange(val);
+              setVisibleCount(PAGE_SIZE);
+            }}
+            proteinRange={proteinRange}
+            onProteinRangeChange={(val) => {
+              setProteinRange(val);
+              setVisibleCount(PAGE_SIZE);
+            }}
             excludedAllergen={excludedAllergen}
             onExcludedAllergenChange={(val) => {
               setExcludedAllergen(val);
@@ -258,10 +329,23 @@ export function FoodsPage() {
             onReset={handleResetFilters}
           />
 
+          {activeGroupMeta && (
+            <Alert tone="info" title={`Đang lọc: ${activeGroupMeta.labelVi}`}>
+              <div className="space-y-1 text-xs">
+                <p>{activeGroupMeta.descriptionVi}</p>
+                <p className="text-slate-600">
+                  <strong>Tiêu chí:</strong> {activeGroupMeta.thresholdRuleVi} ·{' '}
+                  <strong>Lưu ý:</strong> {activeGroupMeta.cautionsVi}
+                </p>
+              </div>
+            </Alert>
+          )}
+
           {includeUnverified && (
-            <Alert tone="warning" title="Đang hiển thị dữ liệu chưa xác minh / ước tính">
-              Các món gắn nhãn &ldquo;Ước tính&rdquo; hoặc &ldquo;Chưa xác minh&rdquo; chỉ mang tính tham
-              khảo sơ bộ và không phải số liệu đã kiểm chứng.
+            <Alert tone="info" title="Hiển thị minh bạch nguồn dữ liệu">
+              Các món gắn nhãn &ldquo;Ước tính&rdquo; hoặc &ldquo;Chưa xác minh&rdquo; được
+              tổng hợp từ công thức món ăn Việt phổ biến để học tập tham khảo. Bạn có
+              thể tắt tùy chọn trên để chỉ xem dữ liệu đã xác minh chính thức.
             </Alert>
           )}
 
@@ -307,7 +391,7 @@ export function FoodsPage() {
               title="Không tìm thấy thực phẩm phù hợp"
               description={
                 !includeUnverified
-                  ? 'Không có thực phẩm đã xác minh khớp bộ lọc hiện tại. Bạn có thể đặt lại bộ lọc hoặc bật tùy chọn xem thêm dữ liệu ước tính / chưa xác minh.'
+                  ? 'Không có thực phẩm đã xác minh khớp bộ lọc hiện tại. Bạn có thể đặt lại bộ lọc hoặc bật tùy chọn xem thêm dữ liệu ước tính.'
                   : 'Hãy thử từ khóa khác (không cần dấu) hoặc đặt lại bộ lọc.'
               }
               action={

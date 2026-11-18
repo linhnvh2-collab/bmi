@@ -4,6 +4,7 @@ import type {
   NutrientsPer100g,
   ServingUnit,
 } from '@/src/types/food';
+import { filterFoodsByNutrientGroup } from './classification';
 import { normalizeVietnamese } from './normalize';
 
 /**
@@ -123,7 +124,12 @@ export function searchFoods(
       ? filterByAllergens(foods, filters.excludedAllergens).foods
       : foods;
 
-  return afterAllergens.filter((food) => {
+  const afterGroup =
+    filters.nutrientGroup && filters.nutrientGroup !== 'all'
+      ? filterFoodsByNutrientGroup(afterAllergens, filters.nutrientGroup)
+      : afterAllergens;
+
+  return afterGroup.filter((food) => {
     if (!includeInactive && !food.isActive) {
       return false;
     }
@@ -153,6 +159,23 @@ export function searchFoods(
       !food.dietTags.includes(filters.dietTag)
     ) {
       return false;
+    }
+
+    if (filters.energyRange && filters.energyRange !== 'all') {
+      const kcal = food.nutrientsPer100g.energyKcal;
+      if (kcal === null) return false;
+      if (filters.energyRange === 'low' && kcal >= 100) return false;
+      if (filters.energyRange === 'medium' && (kcal < 100 || kcal > 220)) return false;
+      if (filters.energyRange === 'high' && kcal <= 220) return false;
+    }
+
+    if (filters.proteinRange && filters.proteinRange !== 'all') {
+      const protein = food.nutrientsPer100g.proteinG;
+      if (protein === null) return false;
+      if (filters.proteinRange === 'high' && protein < 14) return false;
+      if (filters.proteinRange === 'moderate' && (protein < 5 || protein >= 14)) {
+        return false;
+      }
     }
 
     if (!normalizedQuery) {

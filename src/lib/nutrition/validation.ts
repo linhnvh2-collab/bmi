@@ -176,14 +176,21 @@ export const foodInputSchema = z
         (val) => {
           if (val === null || val === '') return true;
           if (val.includes('..')) return false;
-          return /^\/images\/foods\/[a-zA-Z0-9_\-./]+$/.test(val);
+          return /^(\/images\/foods\/|\/src\/assets\/images\/)[a-zA-Z0-9_\-./]+$/.test(
+            val
+          );
         },
         {
           message:
-            'Đường dẫn ảnh phải là ảnh tĩnh nội bộ bắt đầu bằng /images/foods/ (không dùng URL ngoài).',
+            'Đường dẫn ảnh phải là ảnh tĩnh nội bộ bắt đầu bằng /images/foods/ hoặc /src/assets/images/ (không dùng URL ngoài).',
         }
       )
       .transform((val) => (val === '' ? null : val)),
+    ingredients: z
+      .array(z.string().trim().min(1).max(100))
+      .max(25)
+      .optional(),
+    preparationNote: z.string().trim().max(400).optional(),
     isActive: z.boolean().default(true),
   })
   .superRefine((data, ctx) => {

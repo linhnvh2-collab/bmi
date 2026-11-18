@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Check,
   Download,
   Plus,
   Save,
+  Sparkles,
   Trash2,
   X,
 } from 'lucide-react';
@@ -37,8 +38,16 @@ import {
 } from '@/src/lib/firebase/profileService';
 import {
   ALLERGEN_OPTIONS,
+  BUDGET_LEVEL_OPTIONS,
+  DIET_MODE_OPTIONS,
   DIETARY_PREFERENCE_OPTIONS,
-} from '@/src/lib/nutrition/constants';
+  NUTRITION_GOAL_OPTIONS,
+  PREP_TIME_OPTIONS,
+} from '@/src/lib/nutrition';
+import {
+  calculateAgeFromBirthDate,
+  calculateAgeFromBirthYear,
+} from '@/src/lib/format/date';
 import {
   profileFormSchema,
   type ProfileFormValues,
@@ -59,6 +68,7 @@ export function ProfilePage() {
   } | null>(null);
   const [customDietary, setCustomDietary] = useState('');
   const [customAllergen, setCustomAllergen] = useState('');
+  const [customDisliked, setCustomDisliked] = useState('');
   const [isExporting, setIsExporting] = useState(false);
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -71,12 +81,20 @@ export function ProfilePage() {
     defaultValues: {
       displayName: user?.displayName || '',
       birthYear: 1995,
+      birthDate: null,
       sex: 'other',
       heightCm: 170,
       weightKg: 65,
       activityLevel: 'moderate',
       dietaryPreferences: [],
       allergens: [],
+      dislikedFoods: [],
+      budgetLevel: 'standard',
+      dailyBudgetVnd: null,
+      prepTimePreference: 'moderate',
+      mealsPerDay: 4,
+      nutritionGoal: 'nutrition_balance',
+      dietMode: 'balanced',
       consentAccepted: false,
     },
   });
@@ -86,12 +104,20 @@ export function ProfilePage() {
       form.reset({
         displayName: profile.displayName,
         birthYear: profile.birthYear,
+        birthDate: profile.birthDate ?? null,
         sex: profile.sex,
         heightCm: profile.heightCm,
         weightKg: profile.weightKg,
         activityLevel: profile.activityLevel,
         dietaryPreferences: profile.dietaryPreferences,
         allergens: profile.allergens,
+        dislikedFoods: profile.dislikedFoods ?? [],
+        budgetLevel: profile.budgetLevel ?? 'standard',
+        dailyBudgetVnd: profile.dailyBudgetVnd ?? null,
+        prepTimePreference: profile.prepTimePreference ?? 'moderate',
+        mealsPerDay: profile.mealsPerDay ?? 4,
+        nutritionGoal: profile.nutritionGoal ?? 'nutrition_balance',
+        dietMode: profile.dietMode ?? 'balanced',
         consentAccepted: profile.consentAccepted,
       });
     } else if (user) {
@@ -99,16 +125,26 @@ export function ProfilePage() {
     }
   }, [profile, user, form]);
 
+  const birthDateVal = form.watch('birthDate');
+  const birthYearVal = form.watch('birthYear');
+  const resolvedAge =
+    typeof birthDateVal === 'string' && birthDateVal
+      ? calculateAgeFromBirthDate(birthDateVal)
+      : Number.isFinite(Number(birthYearVal))
+        ? calculateAgeFromBirthYear(Number(birthYearVal))
+        : null;
+
   const dietaryPreferences = form.watch('dietaryPreferences');
   const allergens = form.watch('allergens');
+  const dislikedFoods = form.watch('dislikedFoods') ?? [];
   const consentAccepted = form.watch('consentAccepted');
 
   const toggleItem = (
-    field: 'dietaryPreferences' | 'allergens',
+    field: 'dietaryPreferences' | 'allergens' | 'dislikedFoods',
     value: string,
     maxCount: number
   ) => {
-    const current = form.getValues(field);
+    const current = form.getValues(field) ?? [];
     if (current.includes(value)) {
       form.setValue(
         field,
@@ -124,14 +160,14 @@ export function ProfilePage() {
   };
 
   const addCustomItem = (
-    field: 'dietaryPreferences' | 'allergens',
+    field: 'dietaryPreferences' | 'allergens' | 'dislikedFoods',
     rawValue: string,
     maxCount: number,
     clearInput: () => void
   ) => {
     const trimmed = rawValue.trim();
     if (!trimmed) return;
-    const current = form.getValues(field);
+    const current = form.getValues(field) ?? [];
     if (!current.includes(trimmed) && current.length < maxCount) {
       form.setValue(field, [...current, trimmed.slice(0, 60)], {
         shouldDirty: true,
@@ -149,7 +185,7 @@ export function ProfilePage() {
       await refreshProfile();
       setSaveStatus({
         tone: 'success',
-        text: 'Đã lưu hồ sơ cá nhân và xác nhận đồng ý dữ liệu thành công.',
+        text: 'Đã lưu hồ sơ cá nhân và cấu hình dinh dưỡng thành công.',
       });
     } catch (error) {
       setSaveStatus({
@@ -180,7 +216,7 @@ export function ProfilePage() {
       URL.revokeObjectURL(url);
       setSaveStatus({
         tone: 'success',
-        text: 'Đã xuất toàn bộ dữ liệu cá nhân và lịch sử BMI thành tệp JSON.',
+        text: 'Đã xuất toàn bộ dữ liệu cá nhân, lịch sử BMI và thực đơn thành tệp JSON.',
       });
     } catch (error) {
       setSaveStatus({
@@ -228,14 +264,26 @@ export function ProfilePage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-          Hồ sơ cá nhân &amp; Quyền riêng tư
-        </h1>
-        <p className="text-sm text-slate-600">
-          Thông tin được lưu riêng theo tài khoản của bạn để hỗ trợ theo dõi BMI và
-          chuẩn bị cho các giai đoạn thực đơn Việt Nam sau này.
-        </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            Hồ sơ cá nhân &amp; Quyền riêng tư
+          </h1>
+          <p className="text-sm text-slate-600">
+            Thông tin được lưu riêng theo tài khoản của bạn để hỗ trợ theo dõi BMI,
+            phân tích nhu cầu dinh dưỡng và tạo thực đơn AI cá nhân hóa.
+          </p>
+        </div>
+
+        <Link to="/nutrition-plan">
+          <Button
+            variant="outline"
+            size="sm"
+            leftIcon={<Sparkles className="h-3.5 w-3.5" aria-hidden="true" />}
+          >
+            Xem kế hoạch dinh dưỡng
+          </Button>
+        </Link>
       </div>
 
       {profileError && <Alert tone="danger">{profileError}</Alert>}
@@ -293,6 +341,42 @@ export function ProfilePage() {
             </FormField>
 
             <FormField
+              id="profile-birth-date"
+              label="Ngày sinh chính xác (tùy chọn)"
+              hint={
+                resolvedAge !== null
+                  ? `Độ tuổi hiện tại: ${resolvedAge} tuổi`
+                  : 'Tự động đồng bộ năm sinh và tính tuổi theo ngày.'
+              }
+              error={form.formState.errors.birthDate?.message}
+            >
+              <Input
+                id="profile-birth-date"
+                type="date"
+                value={birthDateVal ?? ''}
+                onChange={(e) => {
+                  const next = e.target.value.trim();
+                  form.setValue('birthDate', next ? next : null, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  });
+                  if (/^\d{4}-\d{2}-\d{2}$/.test(next)) {
+                    const y = Number(next.slice(0, 4));
+                    if (
+                      y >= PROFILE_INPUT_LIMITS.BIRTH_YEAR_MIN &&
+                      y <= PROFILE_INPUT_LIMITS.BIRTH_YEAR_MAX
+                    ) {
+                      form.setValue('birthYear', y, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      });
+                    }
+                  }
+                }}
+              />
+            </FormField>
+
+            <FormField
               id="profile-birth-year"
               label="Năm sinh"
               required
@@ -312,6 +396,7 @@ export function ProfilePage() {
               id="profile-sex"
               label="Giới tính"
               required
+              hint="Thông số Nam/Nữ cần cho công thức BMR; chọn Khác nếu chỉ theo dõi BMI."
               error={form.formState.errors.sex?.message}
             >
               <Select
@@ -363,7 +448,7 @@ export function ProfilePage() {
             id="profile-activity"
             label="Mức độ vận động hàng ngày"
             required
-            hint="Thông tin này chỉ dùng để lưu sẵn cho các giai đoạn học tập về năng lượng sau này."
+            hint="Dùng để ước tính nhu cầu năng lượng TDEE (chỉ dành cho 18+)."
             error={form.formState.errors.activityLevel?.message}
           >
             <Select
@@ -378,6 +463,162 @@ export function ProfilePage() {
           </FormField>
         </Card>
 
+        {/* Personalized Nutrition Plan Settings */}
+        <Card className="space-y-5">
+          <div className="space-y-1 border-b border-slate-200 pb-4">
+            <h2 className="text-base font-semibold text-slate-900">
+              Nhu cầu &amp; Thói quen ăn uống cá nhân
+            </h2>
+            <p className="text-xs text-slate-500">
+              Các tùy chọn này giúp hệ thống cá nhân hóa gợi ý khẩu phần, tỷ lệ dinh
+              dưỡng và thực đơn AI phù hợp thời gian nấu nướng cùng ngân sách của bạn.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormField id="profile-nutrition-goal" label="Mục tiêu dinh dưỡng chính">
+              <Select
+                id="profile-nutrition-goal"
+                options={NUTRITION_GOAL_OPTIONS.map((g) => ({
+                  value: g.value,
+                  label: g.labelVi,
+                }))}
+                {...form.register('nutritionGoal')}
+              />
+            </FormField>
+
+            <FormField id="profile-diet-mode" label="Chế độ ăn ưu tiên">
+              <Select
+                id="profile-diet-mode"
+                options={DIET_MODE_OPTIONS.map((d) => ({
+                  value: d.value,
+                  label: d.labelVi,
+                }))}
+                {...form.register('dietMode')}
+              />
+            </FormField>
+
+            <FormField id="profile-budget-level" label="Mức ngân sách bữa ăn">
+              <Select
+                id="profile-budget-level"
+                options={BUDGET_LEVEL_OPTIONS.map((b) => ({
+                  value: b.value,
+                  label: b.labelVi,
+                }))}
+                {...form.register('budgetLevel')}
+              />
+            </FormField>
+
+            <FormField
+              id="profile-prep-time"
+              label="Thời gian chuẩn bị / nấu nướng"
+            >
+              <Select
+                id="profile-prep-time"
+                options={PREP_TIME_OPTIONS.map((p) => ({
+                  value: p.value,
+                  label: p.labelVi,
+                }))}
+                {...form.register('prepTimePreference')}
+              />
+            </FormField>
+
+            <FormField
+              id="profile-meals-per-day"
+              label="Số bữa ăn mong muốn mỗi ngày"
+              hint="Dùng khi AI phân bổ khung bữa trong thực đơn cá nhân."
+            >
+              <Select
+                id="profile-meals-per-day"
+                options={[
+                  { value: '3', label: '3 bữa chính (Sáng · Trưa · Tối)' },
+                  { value: '4', label: '4 bữa (3 bữa chính + 1 bữa phụ chiều)' },
+                  { value: '5', label: '5 bữa (3 bữa chính + 2 bữa phụ)' },
+                ]}
+                {...form.register('mealsPerDay')}
+              />
+            </FormField>
+
+            <FormField
+              id="profile-daily-budget-vnd"
+              label="Ngân sách ăn uống tham khảo mỗi ngày (tùy chọn)"
+              hint="Ví dụ: 80000 cho ~80.000đ/ngày."
+              error={form.formState.errors.dailyBudgetVnd?.message}
+            >
+              <Input
+                id="profile-daily-budget-vnd"
+                type="text"
+                inputMode="numeric"
+                unitLabel="VNĐ"
+                placeholder="VD: 80000"
+                hasError={Boolean(form.formState.errors.dailyBudgetVnd)}
+                {...form.register('dailyBudgetVnd')}
+              />
+            </FormField>
+          </div>
+
+          {/* Disliked foods */}
+          <div className="space-y-3 border-t border-slate-200 pt-4">
+            <label className="block text-sm font-medium text-slate-800">
+              Món ăn / nguyên liệu không thích (tối đa 20)
+            </label>
+            {dislikedFoods.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {dislikedFoods.map((item) => (
+                  <span
+                    key={item}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-800"
+                  >
+                    <span>{item}</span>
+                    <button
+                      type="button"
+                      aria-label={`Xóa ${item}`}
+                      onClick={() => toggleItem('dislikedFoods', item, 20)}
+                      className="text-slate-600 hover:text-red-700 cursor-pointer"
+                    >
+                      <X className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2 max-w-md">
+              <Input
+                type="text"
+                value={customDisliked}
+                onChange={(e) => setCustomDisliked(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addCustomItem(
+                      'dislikedFoods',
+                      customDisliked,
+                      20,
+                      () => setCustomDisliked('')
+                    );
+                  }
+                }}
+                placeholder="Ví dụ: Khổ qua, nội tạng, sầu riêng..."
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  addCustomItem(
+                    'dislikedFoods',
+                    customDisliked,
+                    20,
+                    () => setCustomDisliked('')
+                  )
+                }
+                leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}
+              >
+                Thêm
+              </Button>
+            </div>
+          </div>
+        </Card>
+
         {/* Dietary Preferences & Allergens */}
         <Card className="space-y-6">
           <div className="space-y-1 border-b border-slate-200 pb-4">
@@ -385,7 +626,7 @@ export function ProfilePage() {
               Sở thích ăn uống &amp; Dị ứng thực phẩm
             </h2>
             <p className="text-xs text-slate-500">
-              Dùng để lọc thực phẩm an toàn ở các giai đoạn tiếp theo.
+              Dùng để lọc thực phẩm an toàn và loại trừ chất gây dị ứng trong thực đơn AI.
             </p>
           </div>
 
@@ -611,8 +852,8 @@ export function ProfilePage() {
             Quản lý &amp; Quyền đối với dữ liệu cá nhân
           </h2>
           <p className="text-xs leading-relaxed text-slate-600">
-            Bạn có thể tải xuống toàn bộ hồ sơ và lịch sử BMI của mình, hoặc xóa vĩnh
-            viễn toàn bộ dữ liệu và tài khoản khỏi hệ thống.
+            Bạn có thể tải xuống toàn bộ hồ sơ, lịch sử BMI và thực đơn đã lưu của
+            mình, hoặc xóa vĩnh viễn toàn bộ dữ liệu và tài khoản khỏi hệ thống.
           </p>
         </div>
 

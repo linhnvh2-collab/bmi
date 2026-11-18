@@ -13,6 +13,17 @@ export type FoodCategory =
 
 export type VerificationStatus = 'verified' | 'estimated' | 'unverified';
 
+export type NutrientNeedGroupId =
+  | 'rich_protein'
+  | 'rich_carb'
+  | 'healthy_fat'
+  | 'high_fiber'
+  | 'vitamins_minerals'
+  | 'low_energy'
+  | 'high_energy'
+  | 'high_sugar'
+  | 'high_sodium';
+
 export interface NutrientsPer100g {
   energyKcal: number | null;
   proteinG: number | null;
@@ -51,6 +62,8 @@ export interface FoodItem {
   source: FoodSource | null;
   verificationStatus: VerificationStatus;
   imagePath: string | null;
+  ingredients?: string[];
+  preparationNote?: string;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -71,6 +84,8 @@ export interface FoodInput {
   source: FoodSource | null;
   verificationStatus: VerificationStatus;
   imagePath: string | null;
+  ingredients?: string[];
+  preparationNote?: string;
   isActive: boolean;
 }
 
@@ -81,6 +96,9 @@ export interface FoodSearchFilters {
   verificationStatus?: VerificationStatus | 'all';
   includeUnverified?: boolean;
   includeInactive?: boolean;
+  energyRange?: 'all' | 'low' | 'medium' | 'high';
+  proteinRange?: 'all' | 'high' | 'moderate';
+  nutrientGroup?: NutrientNeedGroupId | 'all';
 }
 
 export interface FavoriteFood {

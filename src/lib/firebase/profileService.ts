@@ -14,10 +14,12 @@ import {
 } from 'firebase/firestore';
 import { CONSENT_VERSION, PROFILE_INPUT_LIMITS } from '@/src/lib/calculations/constants';
 import type { HealthRecord, UserProfile, UserProfileInput } from '@/src/types/health';
+import type { SavedMealPlan } from '@/src/types/mealPlan';
 import type { FoodDiaryDay, ShoppingListDoc, UserGoal } from '@/src/types/stage3';
 import { db } from './config';
 import { handleFirestoreError, OperationType } from './errors';
 import { getCurrentGoal } from './goalsService';
+import { listUserMealPlans } from './mealPlansService';
 import { getShoppingList } from './shoppingListService';
 
 function toDate(value: unknown): Date {
@@ -43,6 +45,7 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
       displayName: String(data.displayName ?? ''),
       email: String(data.email ?? ''),
       birthYear: Number(data.birthYear ?? 1995),
+      birthDate: typeof data.birthDate === 'string' ? data.birthDate : null,
       sex: (data.sex as UserProfile['sex']) ?? 'other',
       heightCm: Number(data.heightCm ?? 170),
       weightKg: Number(data.weightKg ?? 65),
@@ -51,6 +54,23 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
         ? data.dietaryPreferences.map(String)
         : [],
       allergens: Array.isArray(data.allergens) ? data.allergens.map(String) : [],
+      dislikedFoods: Array.isArray(data.dislikedFoods)
+        ? data.dislikedFoods.map(String)
+        : [],
+      budgetLevel: (data.budgetLevel as UserProfile['budgetLevel']) ?? 'standard',
+      dailyBudgetVnd:
+        typeof data.dailyBudgetVnd === 'number' ? data.dailyBudgetVnd : null,
+      prepTimePreference:
+        (data.prepTimePreference as UserProfile['prepTimePreference']) ??
+        'moderate',
+      mealsPerDay:
+        data.mealsPerDay === 3 || data.mealsPerDay === 4 || data.mealsPerDay === 5
+          ? data.mealsPerDay
+          : 4,
+      nutritionGoal:
+        (data.nutritionGoal as UserProfile['nutritionGoal']) ??
+        'nutrition_balance',
+      dietMode: (data.dietMode as UserProfile['dietMode']) ?? 'balanced',
       consentAccepted: Boolean(data.consentAccepted),
       consentVersion: String(data.consentVersion ?? CONSENT_VERSION),
       consentAcceptedAt: toDate(data.consentAcceptedAt),
@@ -83,16 +103,32 @@ export async function saveUserProfile(
     .filter(Boolean)
     .slice(0, PROFILE_INPUT_LIMITS.MAX_ALLERGENS);
 
-  const baseFields = {
+  const sanitizedDislikes = (input.dislikedFoods ?? [])
+    .map((item) => item.trim().slice(0, 60))
+    .filter(Boolean)
+    .slice(0, 20);
+
+  const baseFields: Record<string, unknown> = {
     displayName: input.displayName.trim().slice(0, PROFILE_INPUT_LIMITS.DISPLAY_NAME_MAX),
     email: email.trim().slice(0, 254),
     birthYear: Math.round(input.birthYear),
+    birthDate: input.birthDate ? input.birthDate.trim().slice(0, 10) : null,
     sex: input.sex,
     heightCm: Number(input.heightCm),
     weightKg: Number(input.weightKg),
     activityLevel: input.activityLevel,
     dietaryPreferences: sanitizedDietary,
     allergens: sanitizedAllergens,
+    dislikedFoods: sanitizedDislikes,
+    budgetLevel: input.budgetLevel ?? 'standard',
+    dailyBudgetVnd:
+      typeof input.dailyBudgetVnd === 'number' && Number.isFinite(input.dailyBudgetVnd)
+        ? Math.round(input.dailyBudgetVnd)
+        : null,
+    prepTimePreference: input.prepTimePreference ?? 'moderate',
+    mealsPerDay: input.mealsPerDay ?? 4,
+    nutritionGoal: input.nutritionGoal ?? 'nutrition_balance',
+    dietMode: input.dietMode ?? 'balanced',
     consentAccepted: true,
     consentVersion: CONSENT_VERSION,
     updatedAt: serverTimestamp(),
@@ -127,6 +163,7 @@ export async function exportUserData(uid: string): Promise<{
   currentGoal: UserGoal | null;
   foodDiaries: FoodDiaryDay[];
   shoppingList: ShoppingListDoc | null;
+  mealPlans: SavedMealPlan[];
 }> {
   const profile = await getUserProfile(uid);
   const recordsPath = `users/${uid}/health_records`;
@@ -199,6 +236,7 @@ export async function exportUserData(uid: string): Promise<{
   }
 
   const shoppingList = await getShoppingList(uid);
+  const mealPlans = await listUserMealPlans(uid);
 
   return {
     exportedAt: new Date().toISOString(),
@@ -208,80 +246,33 @@ export async function exportUserData(uid: string): Promise<{
     currentGoal,
     foodDiaries,
     shoppingList,
+    mealPlans,
   };
 }
 
 export async function deleteUserDataAndAccount(user: User): Promise<void> {
   const uid = user.uid;
-  const recordsPath = `users/${uid}/health_records`;
-  try {
-    const q = query(collection(db, 'users', uid, 'health_records'), where('userId', '==', uid));
-    const snap = await getDocs(q);
-    await Promise.all(
-      snap.docs.map((recordDoc) =>
-        deleteDoc(doc(db, 'users', uid, 'health_records', recordDoc.id))
-      )
-    );
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, recordsPath);
-  }
+  const subcollections = [
+    'health_records',
+    'favorites',
+    'food_diaries',
+    'goals',
+    'shopping_list',
+    'meal_plans',
+    'food_scans',
+  ] as const;
 
-  const favPath = `users/${uid}/favorites`;
-  try {
-    const favQ = query(collection(db, 'users', uid, 'favorites'), where('userId', '==', uid));
-    const favSnap = await getDocs(favQ);
-    await Promise.all(
-      favSnap.docs.map((favDoc) =>
-        deleteDoc(doc(db, 'users', uid, 'favorites', favDoc.id))
-      )
-    );
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, favPath);
-  }
-
-  const diariesPath = `users/${uid}/food_diaries`;
-  try {
-    const diariesQ = query(
-      collection(db, 'users', uid, 'food_diaries'),
-      where('userId', '==', uid)
-    );
-    const diariesSnap = await getDocs(diariesQ);
-    await Promise.all(
-      diariesSnap.docs.map((diaryDoc) =>
-        deleteDoc(doc(db, 'users', uid, 'food_diaries', diaryDoc.id))
-      )
-    );
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, diariesPath);
-  }
-
-  const goalsPath = `users/${uid}/goals`;
-  try {
-    const goalsQ = query(collection(db, 'users', uid, 'goals'), where('userId', '==', uid));
-    const goalsSnap = await getDocs(goalsQ);
-    await Promise.all(
-      goalsSnap.docs.map((goalDoc) =>
-        deleteDoc(doc(db, 'users', uid, 'goals', goalDoc.id))
-      )
-    );
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, goalsPath);
-  }
-
-  const shoppingPath = `users/${uid}/shopping_list`;
-  try {
-    const shoppingQ = query(
-      collection(db, 'users', uid, 'shopping_list'),
-      where('userId', '==', uid)
-    );
-    const shoppingSnap = await getDocs(shoppingQ);
-    await Promise.all(
-      shoppingSnap.docs.map((listDoc) =>
-        deleteDoc(doc(db, 'users', uid, 'shopping_list', listDoc.id))
-      )
-    );
-  } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, shoppingPath);
+  for (const sub of subcollections) {
+    const path = `users/${uid}/${sub}`;
+    try {
+      const q = query(collection(db, 'users', uid, sub), where('userId', '==', uid));
+      const snap = await getDocs(q);
+      await Promise.all(
+        snap.docs.map((d) => deleteDoc(doc(db, 'users', uid, sub, d.id)))
+      );
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
   }
 
   const profilePath = `users/${uid}`;

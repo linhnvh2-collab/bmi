@@ -45,6 +45,10 @@ const categoryIcons: Record<FoodCategory, typeof Utensils> = {
   condiments: Utensils,
 };
 
+function fmtMacro(val: number | null): string {
+  return val === null ? '—' : `${val}g`;
+}
+
 export function FoodCard({
   food,
   userAllergens,
@@ -65,20 +69,21 @@ export function FoodCard({
   return (
     <article className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white overflow-hidden transition-colors hover:border-forest-300">
       <div>
-        {/* Image Slot or Category Empty State */}
+        {/* 4:3 Image Slot or Category Empty State */}
         <Link to={`/foods/${food.id}`} className="block">
           {food.imagePath && !imgError ? (
-            <div className="aspect-[16/9] w-full overflow-hidden bg-slate-100 border-b border-slate-200">
+            <div className="aspect-[4/3] w-full overflow-hidden bg-slate-100 border-b border-slate-200">
               <img
                 src={food.imagePath}
                 alt={food.nameVi}
+                loading="lazy"
                 referrerPolicy="no-referrer"
                 onError={() => setImgError(true)}
                 className="h-full w-full object-cover"
               />
             </div>
           ) : (
-            <div className="flex aspect-[16/9] w-full flex-col items-center justify-center gap-1.5 border-b border-slate-200 bg-forest-50/45 px-4 text-center">
+            <div className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-1.5 border-b border-slate-200 bg-forest-50/45 px-4 text-center">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-forest-200 bg-white text-forest-700">
                 <CategoryIcon className="h-5 w-5" aria-hidden="true" />
               </div>
@@ -111,12 +116,34 @@ export function FoodCard({
             )}
           </div>
 
-          {/* Energy per 100g */}
-          <div className="flex items-baseline justify-between rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2">
-            <span className="text-xs text-slate-600">Năng lượng / 100g</span>
-            <span className="font-mono text-sm font-semibold text-forest-900 tabular-nums">
-              {energyText}
-            </span>
+          {/* Energy + Macro strip per 100g */}
+          <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-2.5 space-y-2">
+            <div className="flex items-baseline justify-between">
+              <span className="text-xs text-slate-600">Năng lượng / 100g</span>
+              <span className="font-mono text-sm font-semibold text-forest-900 tabular-nums">
+                {energyText}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5 border-t border-slate-200/80 pt-2 text-center font-mono text-[11px] tabular-nums">
+              <div>
+                <span className="block text-[10px] font-sans text-slate-500">Đạm</span>
+                <span className="font-semibold text-slate-800">
+                  {fmtMacro(food.nutrientsPer100g.proteinG)}
+                </span>
+              </div>
+              <div>
+                <span className="block text-[10px] font-sans text-slate-500">Carb</span>
+                <span className="font-semibold text-slate-800">
+                  {fmtMacro(food.nutrientsPer100g.carbG)}
+                </span>
+              </div>
+              <div>
+                <span className="block text-[10px] font-sans text-slate-500">Béo</span>
+                <span className="font-semibold text-slate-800">
+                  {fmtMacro(food.nutrientsPer100g.fatG)}
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Allergen tags */}

@@ -192,3 +192,16 @@ export const ALLERGEN_DISCLAIMER_VI =
 
 export const MAX_COMPARE_FOODS = 3;
 export const FIRESTORE_BATCH_LIMIT = 500;
+
+export const BUDGET_LEVEL_OPTIONS = [
+  { value: 'economy', labelVi: 'Tiết kiệm (ưu tiên nguyên liệu phổ thông)' },
+  { value: 'standard', labelVi: 'Tiêu chuẩn (cân bằng chi phí & đa dạng)' },
+  { value: 'flexible', labelVi: 'Linh hoạt (bao gồm cá hồi, hạt cao cấp...)' },
+] as const;
+
+export const PREP_TIME_OPTIONS = [
+  { value: 'quick', labelVi: 'Nhanh gọn (< 20 phút / bữa)' },
+  { value: 'moderate', labelVi: 'Trung bình (20–40 phút / bữa)' },
+  { value: 'elaborate', labelVi: 'Thoải mái nấu cầu kỳ (> 40 phút)' },
+] as const;
+

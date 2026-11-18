@@ -15,6 +15,8 @@ import {
   FIRESTORE_BATCH_LIMIT,
   normalizeVietnamese,
   validateFood,
+  VIETNAMESE_CATALOG_MAP,
+  VIETNAMESE_FOOD_CATALOG,
 } from '@/src/lib/nutrition';
 import type { FoodInput, FoodItem, NutrientsPer100g } from '@/src/types/food';
 import { db } from './config';
@@ -65,6 +67,8 @@ function mapDocToFoodItem(id: string, data: Record<string, unknown>): FoodItem {
       ? (data.source as Record<string, unknown>)
       : null;
 
+  const catalogFallback = VIETNAMESE_CATALOG_MAP.get(String(data.id ?? id));
+
   return {
     id: String(data.id ?? id),
     nameVi: String(data.nameVi ?? ''),
@@ -96,12 +100,39 @@ function mapDocToFoodItem(id: string, data: Record<string, unknown>): FoodItem {
       : null,
     verificationStatus:
       (data.verificationStatus as FoodItem['verificationStatus']) ?? 'unverified',
-    imagePath: data.imagePath ? String(data.imagePath) : null,
+    imagePath: data.imagePath
+      ? String(data.imagePath)
+      : (catalogFallback?.imagePath ?? null),
+    ingredients: Array.isArray(data.ingredients)
+      ? data.ingredients.map(String)
+      : catalogFallback?.ingredients,
+    preparationNote:
+      typeof data.preparationNote === 'string' && data.preparationNote.trim()
+        ? data.preparationNote
+        : catalogFallback?.preparationNote,
     isActive: data.isActive !== false,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
     updatedBy: String(data.updatedBy ?? ''),
   };
+}
+
+function mergeCatalogWithFirestore(
+  firestoreFoods: FoodItem[],
+  includeInactive: boolean
+): FoodItem[] {
+  const merged = new Map<string, FoodItem>();
+
+  for (const seedItem of VIETNAMESE_FOOD_CATALOG) {
+    merged.set(seedItem.id, seedItem);
+  }
+  for (const fsItem of firestoreFoods) {
+    merged.set(fsItem.id, fsItem);
+  }
+
+  return Array.from(merged.values())
+    .filter((item) => includeInactive || item.isActive)
+    .sort((a, b) => a.nameVi.localeCompare(b.nameVi, 'vi'));
 }
 
 export async function fetchFoods(options?: {
@@ -127,9 +158,11 @@ export async function fetchFoods(options?: {
       : query(collection(db, 'foods'), where('isActive', '==', true));
 
     const snap = await getDocs(q);
-    const items = snap.docs
-      .map((docSnap) => mapDocToFoodItem(docSnap.id, docSnap.data()))
-      .sort((a, b) => a.nameVi.localeCompare(b.nameVi, 'vi'));
+    const firestoreItems = snap.docs.map((docSnap) =>
+      mapDocToFoodItem(docSnap.id, docSnap.data())
+    );
+
+    const items = mergeCatalogWithFirestore(firestoreItems, includeInactive);
 
     if (includeInactive) {
       cachedAdminFoods = items;
@@ -140,6 +173,11 @@ export async function fetchFoods(options?: {
 
     return items;
   } catch (error) {
+    if (!includeInactive) {
+      // Fallback safely to curated built-in Vietnamese reference catalog if offline or unindexed
+      console.warn('Firestore foods read error, falling back to reference catalog:', error);
+      return VIETNAMESE_FOOD_CATALOG;
+    }
     handleFirestoreError(error, OperationType.LIST, path);
   }
 }
@@ -160,20 +198,22 @@ export async function fetchFoodById(
   const path = `foods/${foodId}`;
   try {
     const snap = await getDoc(doc(db, 'foods', foodId));
-    if (!snap.exists()) {
-      return null;
+    if (snap.exists()) {
+      return mapDocToFoodItem(snap.id, snap.data());
     }
-    return mapDocToFoodItem(snap.id, snap.data());
   } catch (error) {
-    handleFirestoreError(error, OperationType.GET, path);
+    // Allow catalog lookup fallback if document does not exist in Firestore yet
+    console.warn('Firestore fetchFoodById error:', path, error);
   }
+
+  return VIETNAMESE_CATALOG_MAP.get(foodId) ?? null;
 }
 
 function buildFirestoreFoodPayload(
   validData: FoodInput,
   adminUid: string
 ): Record<string, unknown> {
-  return {
+  const payload: Record<string, unknown> = {
     id: validData.id,
     nameVi: validData.nameVi,
     nameEn: validData.nameEn ?? '',
@@ -192,12 +232,21 @@ function buildFirestoreFoodPayload(
     updatedAt: serverTimestamp(),
     updatedBy: adminUid,
   };
+
+  if (validData.ingredients && validData.ingredients.length > 0) {
+    payload.ingredients = validData.ingredients;
+  }
+  if (validData.preparationNote && validData.preparationNote.trim()) {
+    payload.preparationNote = validData.preparationNote.trim();
+  }
+
+  return payload;
 }
 
 export async function upsertFood(
   input: FoodInput,
   adminUid: string,
-  isExisting: boolean
+  isExistingInFirestore: boolean
 ): Promise<void> {
   const validation = validateFood(input);
   if (!validation.success) {
@@ -210,7 +259,8 @@ export async function upsertFood(
 
   try {
     const docRef = doc(db, 'foods', validData.id);
-    if (isExisting) {
+    const snap = isExistingInFirestore ? await getDoc(docRef) : null;
+    if (snap && snap.exists()) {
       await updateDoc(docRef, payload);
     } else {
       await setDoc(docRef, {
@@ -222,7 +272,7 @@ export async function upsertFood(
   } catch (error) {
     handleFirestoreError(
       error,
-      isExisting ? OperationType.UPDATE : OperationType.CREATE,
+      isExistingInFirestore ? OperationType.UPDATE : OperationType.CREATE,
       path
     );
   }
@@ -235,11 +285,41 @@ export async function setFoodActiveStatus(
 ): Promise<void> {
   const path = `foods/${food.id}`;
   try {
-    await updateDoc(doc(db, 'foods', food.id), {
-      isActive,
-      updatedAt: serverTimestamp(),
-      updatedBy: adminUid,
-    });
+    const docRef = doc(db, 'foods', food.id);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      await updateDoc(docRef, {
+        isActive,
+        updatedAt: serverTimestamp(),
+        updatedBy: adminUid,
+      });
+    } else {
+      const payload = buildFirestoreFoodPayload(
+        {
+          id: food.id,
+          nameVi: food.nameVi,
+          nameEn: food.nameEn,
+          aliases: food.aliases,
+          category: food.category,
+          nutrientsPer100g: food.nutrientsPer100g,
+          servingUnits: food.servingUnits,
+          allergens: food.allergens,
+          allergensReviewed: food.allergensReviewed,
+          dietTags: food.dietTags,
+          source: food.source,
+          verificationStatus: food.verificationStatus,
+          imagePath: food.imagePath,
+          ingredients: food.ingredients,
+          preparationNote: food.preparationNote,
+          isActive,
+        },
+        adminUid
+      );
+      await setDoc(docRef, {
+        ...payload,
+        createdAt: serverTimestamp(),
+      });
+    }
     invalidateFoodsCache();
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, path);
@@ -255,7 +335,7 @@ export interface BatchImportSummary {
 
 export async function batchImportFoods(
   validItems: FoodInput[],
-  existingIds: Set<string>,
+  existingFirestoreIds: Set<string>,
   adminUid: string,
   skippedInvalidCount: number
 ): Promise<BatchImportSummary> {
@@ -277,7 +357,7 @@ export async function batchImportFoods(
       const docRef = doc(db, 'foods', validData.id);
       const payload = buildFirestoreFoodPayload(validData, adminUid);
 
-      if (existingIds.has(validData.id)) {
+      if (existingFirestoreIds.has(validData.id)) {
         batch.update(docRef, payload);
         updated += 1;
       } else {
@@ -304,4 +384,30 @@ export async function batchImportFoods(
     skipped: skippedInvalidCount,
     errors,
   };
+}
+
+export async function syncReferenceCatalogToFirestore(
+  adminUid: string
+): Promise<BatchImportSummary> {
+  const snap = await getDocs(collection(db, 'foods'));
+  const existingFirestoreIds = new Set(snap.docs.map((d) => d.id));
+  const items: FoodInput[] = VIETNAMESE_FOOD_CATALOG.map((item) => ({
+    id: item.id,
+    nameVi: item.nameVi,
+    nameEn: item.nameEn,
+    aliases: item.aliases,
+    category: item.category,
+    nutrientsPer100g: item.nutrientsPer100g,
+    servingUnits: item.servingUnits,
+    allergens: item.allergens,
+    allergensReviewed: item.allergensReviewed,
+    dietTags: item.dietTags,
+    source: item.source,
+    verificationStatus: item.verificationStatus,
+    imagePath: item.imagePath,
+    ingredients: item.ingredients,
+    preparationNote: item.preparationNote,
+    isActive: item.isActive,
+  }));
+  return batchImportFoods(items, existingFirestoreIds, adminUid, 0);
 }

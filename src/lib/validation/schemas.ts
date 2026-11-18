@@ -111,6 +111,15 @@ export const profileFormSchema = z.object({
           `Năm sinh không được lớn hơn ${PROFILE_INPUT_LIMITS.BIRTH_YEAR_MAX}.`
         )
   ),
+  birthDate: z
+    .preprocess(
+      (v) => (v === '' || v === undefined ? null : v),
+      z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày sinh phải có định dạng YYYY-MM-DD.')
+        .nullable()
+    )
+    .optional(),
   sex: z.enum(['male', 'female', 'other'], {
     error: 'Vui lòng chọn giới tính.',
   }),
@@ -157,6 +166,45 @@ export const profileFormSchema = z.object({
       PROFILE_INPUT_LIMITS.MAX_ALLERGENS,
       `Tối đa ${PROFILE_INPUT_LIMITS.MAX_ALLERGENS} mục dị ứng.`
     ),
+  dislikedFoods: z
+    .array(z.string().trim().min(1).max(60))
+    .max(20, 'Tối đa 20 món không thích.')
+    .optional(),
+  budgetLevel: z.enum(['economy', 'standard', 'flexible']).optional(),
+  dailyBudgetVnd: createOptionalNullableNumericField(
+    'Ngân sách hằng ngày phải là số VNĐ hợp lệ.',
+    (s) =>
+      s
+        .min(10000, 'Ngân sách tham khảo tối thiểu 10.000đ/ngày.')
+        .max(5000000, 'Ngân sách tối đa 5.000.000đ/ngày.')
+  ).optional(),
+  prepTimePreference: z.enum(['quick', 'moderate', 'elaborate']).optional(),
+  mealsPerDay: z
+    .preprocess(
+      (v) => (v === '' || v === null || v === undefined ? undefined : Number(v)),
+      z.union([z.literal(3), z.literal(4), z.literal(5)])
+    )
+    .optional(),
+  nutritionGoal: z
+    .enum([
+      'maintain',
+      'lose_gradual',
+      'gain_gradual',
+      'build_muscle',
+      'nutrition_balance',
+      'healthy_habits',
+    ])
+    .optional(),
+  dietMode: z
+    .enum([
+      'balanced',
+      'plant_heavy',
+      'high_protein',
+      'vegetarian',
+      'budget_friendly',
+      'custom',
+    ])
+    .optional(),
   consentAccepted: z.boolean().refine((val) => val === true, {
     message:
       'Bạn cần đồng ý với điều khoản bảo vệ dữ liệu cá nhân (tham chiếu Nghị định 13/2023/NĐ-CP) trước khi lưu dữ liệu sức khỏe.',

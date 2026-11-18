@@ -3,3 +3,7 @@ export * from './normalize';
 export * from './nutrients';
 export * from './validation';
 export * from './csv';
+export * from './vietnameseCatalog';
+export * from './classification';
+export * from './foodMeta';
+export * from './personalizedPlan';

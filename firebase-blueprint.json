@@ -28,6 +28,11 @@
           "type": "number",
           "description": "Năm sinh (1900–2021)."
         },
+        "birthDate": {
+          "type": "string",
+          "description": "Ngày sinh chính xác (YYYY-MM-DD, tùy chọn).",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
         "sex": {
           "type": "string",
           "description": "Giới tính sinh học phục vụ công thức tham khảo.",
@@ -53,6 +58,48 @@
         "allergens": {
           "type": "array",
           "description": "Danh sách thực phẩm dị ứng hoặc cần tránh (tối đa 20 mục)."
+        },
+        "dislikedFoods": {
+          "type": "array",
+          "description": "Thực phẩm không thích (tối đa 20 mục)."
+        },
+        "budgetLevel": {
+          "type": "string",
+          "enum": ["economy", "standard", "flexible"]
+        },
+        "dailyBudgetVnd": {
+          "type": "number",
+          "description": "Ngân sách ăn uống tham khảo mỗi ngày (VNĐ)."
+        },
+        "prepTimePreference": {
+          "type": "string",
+          "enum": ["quick", "moderate", "elaborate"]
+        },
+        "mealsPerDay": {
+          "type": "number",
+          "description": "Số bữa ăn mỗi ngày (3, 4 hoặc 5)."
+        },
+        "nutritionGoal": {
+          "type": "string",
+          "enum": [
+            "maintain",
+            "lose_gradual",
+            "gain_gradual",
+            "build_muscle",
+            "nutrition_balance",
+            "healthy_habits"
+          ]
+        },
+        "dietMode": {
+          "type": "string",
+          "enum": [
+            "balanced",
+            "plant_heavy",
+            "high_protein",
+            "vegetarian",
+            "budget_friendly",
+            "custom"
+          ]
         },
         "consentAccepted": {
           "type": "boolean",
@@ -433,6 +480,68 @@
         }
       },
       "required": ["userId", "items", "updatedAt"]
+    },
+    "SavedMealPlan": {
+      "title": "SavedMealPlan",
+      "description": "Thực đơn dinh dưỡng gợi ý bởi AI và tính toán giá trị từ kho món ăn (ước tính tham khảo).",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 140 },
+        "durationDays": { "type": "number" },
+        "dietMode": { "type": "string" },
+        "nutritionGoal": { "type": "string" },
+        "targetKcalPerDay": { "type": "number" },
+        "days": { "type": "array" },
+        "aiSummary": { "type": "string", "maxLength": 1200 },
+        "isEstimated": { "type": "boolean" },
+        "isFavorite": { "type": "boolean" },
+        "availableIngredients": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "userId",
+        "title",
+        "durationDays",
+        "dietMode",
+        "nutritionGoal",
+        "targetKcalPerDay",
+        "days",
+        "aiSummary",
+        "isEstimated",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "FoodScanRecord": {
+      "title": "FoodScanRecord",
+      "description": "Lịch sử phân tích ảnh món ăn gắn với tài khoản người dùng và đường dẫn Firebase Storage riêng tư.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "storagePath": { "type": "string", "maxLength": 300 },
+        "summaryVi": { "type": "string", "maxLength": 600 },
+        "isFoodImage": { "type": "boolean" },
+        "detectedCount": { "type": "number" },
+        "items": { "type": "array" },
+        "confirmedToDiary": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "userId",
+        "storagePath",
+        "summaryVi",
+        "isFoodImage",
+        "detectedCount",
+        "items",
+        "confirmedToDiary",
+        "createdAt"
+      ]
     }
   },
   "firestore": {
@@ -463,6 +572,14 @@
     "/users/{userId}/shopping_list/{listId}": {
       "schema": { "$ref": "#/entities/ShoppingList" },
       "description": "Danh sách mua sắm thực phẩm của từng người dùng (document ID: current)."
+    },
+    "/users/{userId}/meal_plans/{planId}": {
+      "schema": { "$ref": "#/entities/SavedMealPlan" },
+      "description": "Thực đơn AI cá nhân hóa được lưu theo từng người dùng."
+    },
+    "/users/{userId}/food_scans/{scanId}": {
+      "schema": { "$ref": "#/entities/FoodScanRecord" },
+      "description": "Lịch sử ảnh bữa ăn đã phân tích của từng người dùng."
     }
   }
 }

@@ -4,15 +4,29 @@ import {
   ALLERGEN_OPTIONS,
   DIET_TAG_OPTIONS,
   FOOD_CATEGORY_OPTIONS,
+  NUTRIENT_NEED_GROUPS,
 } from '@/src/lib/nutrition';
-import type { FoodCategory, VerificationStatus } from '@/src/types/food';
+import type {
+  FoodCategory,
+  NutrientNeedGroupId,
+  VerificationStatus,
+} from '@/src/types/food';
 import { SearchInput } from './SearchInput';
+
+export type EnergyRangeFilter = 'all' | 'low' | 'medium' | 'high';
+export type ProteinRangeFilter = 'all' | 'high' | 'moderate';
 
 interface FilterBarProps {
   searchQuery: string;
   onSearchQueryChange: (val: string) => void;
   category: FoodCategory | 'all';
   onCategoryChange: (val: FoodCategory | 'all') => void;
+  nutrientGroup: NutrientNeedGroupId | 'all';
+  onNutrientGroupChange: (val: NutrientNeedGroupId | 'all') => void;
+  energyRange: EnergyRangeFilter;
+  onEnergyRangeChange: (val: EnergyRangeFilter) => void;
+  proteinRange: ProteinRangeFilter;
+  onProteinRangeChange: (val: ProteinRangeFilter) => void;
   excludedAllergen: string;
   onExcludedAllergenChange: (val: string) => void;
   dietTag: string;
@@ -29,6 +43,12 @@ export function FilterBar({
   onSearchQueryChange,
   category,
   onCategoryChange,
+  nutrientGroup,
+  onNutrientGroupChange,
+  energyRange,
+  onEnergyRangeChange,
+  proteinRange,
+  onProteinRangeChange,
   excludedAllergen,
   onExcludedAllergenChange,
   dietTag,
@@ -43,10 +63,7 @@ export function FilterBar({
     <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
         <div className="lg:col-span-5">
-          <SearchInput
-            value={searchQuery}
-            onChange={onSearchQueryChange}
-          />
+          <SearchInput value={searchQuery} onChange={onSearchQueryChange} />
         </div>
 
         <div className="lg:col-span-3">
@@ -57,7 +74,7 @@ export function FilterBar({
               onCategoryChange(e.target.value as FoodCategory | 'all')
             }
             options={[
-              { value: 'all', label: 'Tất cả nhóm thực phẩm' },
+              { value: 'all', label: 'Tất cả nhóm món ăn' },
               ...FOOD_CATEGORY_OPTIONS.map((c) => ({
                 value: c.value,
                 label: c.labelVi,
@@ -95,6 +112,51 @@ export function FilterBar({
             ]}
           />
         </div>
+      </div>
+
+      {/* Nutrient Need & Energy / Protein Filters */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Select
+          aria-label="Phân loại theo nhu cầu dinh dưỡng"
+          value={nutrientGroup}
+          onChange={(e) =>
+            onNutrientGroupChange(e.target.value as NutrientNeedGroupId | 'all')
+          }
+          options={[
+            { value: 'all', label: 'Tất cả nhóm nhu cầu dinh dưỡng' },
+            ...NUTRIENT_NEED_GROUPS.map((g) => ({
+              value: g.id,
+              label: g.labelVi,
+            })),
+          ]}
+        />
+
+        <Select
+          aria-label="Lọc theo mức năng lượng"
+          value={energyRange}
+          onChange={(e) =>
+            onEnergyRangeChange(e.target.value as EnergyRangeFilter)
+          }
+          options={[
+            { value: 'all', label: 'Mọi mức năng lượng (kcal)' },
+            { value: 'low', label: 'Ít năng lượng (< 100 kcal/100g)' },
+            { value: 'medium', label: 'Trung bình (100–220 kcal/100g)' },
+            { value: 'high', label: 'Năng lượng cao (> 220 kcal/100g)' },
+          ]}
+        />
+
+        <Select
+          aria-label="Lọc theo hàm lượng đạm"
+          value={proteinRange}
+          onChange={(e) =>
+            onProteinRangeChange(e.target.value as ProteinRangeFilter)
+          }
+          options={[
+            { value: 'all', label: 'Mọi mức chất đạm (Protein)' },
+            { value: 'high', label: 'Giàu đạm (≥ 14g/100g)' },
+            { value: 'moderate', label: 'Đạm trung bình (5–13.9g/100g)' },
+          ]}
+        />
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-3.5">

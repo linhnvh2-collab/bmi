@@ -37,6 +37,8 @@ interface RawFoodFormValues {
   nameVi: string;
   nameEn: string;
   aliasesText: string;
+  ingredientsText: string;
+  preparationNote: string;
   category: FoodCategory;
   energyKcal: string;
   proteinG: string;
@@ -83,6 +85,8 @@ export function FoodFormModal({
       nameVi: '',
       nameEn: '',
       aliasesText: '',
+      ingredientsText: '',
+      preparationNote: '',
       category: 'rice_noodles',
       energyKcal: '',
       proteinG: '',
@@ -118,6 +122,8 @@ export function FoodFormModal({
         nameVi: editingFood.nameVi,
         nameEn: editingFood.nameEn,
         aliasesText: editingFood.aliases.join(', '),
+        ingredientsText: (editingFood.ingredients ?? []).join(', '),
+        preparationNote: editingFood.preparationNote ?? '',
         category: editingFood.category,
         energyKcal: toStringOrEmpty(editingFood.nutrientsPer100g.energyKcal),
         proteinG: toStringOrEmpty(editingFood.nutrientsPer100g.proteinG),
@@ -146,6 +152,8 @@ export function FoodFormModal({
         nameVi: '',
         nameEn: '',
         aliasesText: '',
+        ingredientsText: '',
+        preparationNote: '',
         category: 'rice_noodles',
         energyKcal: '',
         proteinG: '',
@@ -172,6 +180,7 @@ export function FoodFormModal({
   const selectedDietTags = form.watch('dietTags');
   const verificationStatus = form.watch('verificationStatus');
   const nameViValue = form.watch('nameVi');
+  const imagePathValue = form.watch('imagePath');
 
   const toggleArrayField = (
     field: 'allergens' | 'dietTags',
@@ -203,6 +212,11 @@ export function FoodFormModal({
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean),
+      ingredients: raw.ingredientsText
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+      preparationNote: raw.preparationNote.trim(),
       category: raw.category,
       nutrientsPer100g: {
         energyKcal: parseNullableNutrient(raw.energyKcal),
@@ -293,11 +307,7 @@ export function FoodFormModal({
         )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <FormField
-            id="food-name-vi"
-            label="Tên tiếng Việt"
-            required
-          >
+          <FormField id="food-name-vi" label="Tên tiếng Việt" required>
             <Input
               id="food-name-vi"
               placeholder="Ví dụ: Phở bò"
@@ -369,6 +379,30 @@ export function FoodFormModal({
             {...form.register('aliasesText')}
           />
         </FormField>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <FormField
+            id="food-ingredients"
+            label="Thành phần chính (phân tách dấu phẩy)"
+          >
+            <Input
+              id="food-ingredients"
+              placeholder="Bánh phở, thịt bò thăn, hành lá"
+              {...form.register('ingredientsText')}
+            />
+          </FormField>
+
+          <FormField
+            id="food-prep-note"
+            label="Ghi chú chế biến"
+          >
+            <Input
+              id="food-prep-note"
+              placeholder="Chần bánh phở và thịt bò với nước dùng trong..."
+              {...form.register('preparationNote')}
+            />
+          </FormField>
+        </div>
 
         {/* Nutrients per 100g */}
         <div className="space-y-3 border-t border-slate-200 pt-4">
@@ -464,15 +498,29 @@ export function FoodFormModal({
 
             <FormField
               id="food-image-path"
-              label="Đường dẫn ảnh tĩnh (/images/foods/...)"
+              label="Đường dẫn ảnh nội bộ (/src/assets/images/... hoặc /images/foods/...)"
             >
               <Input
                 id="food-image-path"
-                placeholder="/images/foods/pho-bo.jpg"
+                placeholder="/src/assets/images/pho_bo_tai.jpg"
                 {...form.register('imagePath')}
               />
             </FormField>
           </div>
+
+          {(imagePathValue.trim().startsWith('/src/assets/images/') ||
+            imagePathValue.trim().startsWith('/images/foods/')) && (
+            <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+              <img
+                src={imagePathValue.trim()}
+                alt="Xem trước ảnh món ăn"
+                className="h-14 w-20 rounded object-cover border border-slate-200"
+              />
+              <span className="text-xs text-slate-600">
+                Xem trước ảnh nội bộ
+              </span>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <FormField

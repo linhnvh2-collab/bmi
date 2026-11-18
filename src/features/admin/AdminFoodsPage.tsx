@@ -6,6 +6,7 @@ import {
   Download,
   Pencil,
   Plus,
+  RefreshCw,
   Trash2,
   Upload,
   XCircle,
@@ -31,6 +32,7 @@ import {
   batchImportFoods,
   fetchFoods,
   setFoodActiveStatus,
+  syncReferenceCatalogToFirestore,
   upsertFood,
   type BatchImportSummary,
 } from '@/src/lib/firebase/foodsService';
@@ -38,6 +40,7 @@ import {
   FOOD_CATEGORY_LABELS,
   searchFoods,
   validateImportPayload,
+  VIETNAMESE_FOOD_CATALOG,
   type ImportRowPreview,
 } from '@/src/lib/nutrition';
 import type { FoodInput, FoodItem } from '@/src/types/food';
@@ -105,6 +108,7 @@ export function AdminFoodsPage() {
   const [activeTab, setActiveTab] = useState<AdminTab>('list');
   const [foods, setFoods] = useState<FoodItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncingCatalog, setSyncingCatalog] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<{
     tone: 'success' | 'danger';
@@ -156,6 +160,27 @@ export function AdminFoodsPage() {
     () => new Set(foods.map((f) => f.id)),
     [foods]
   );
+
+  const handleSyncReferenceCatalog = async () => {
+    if (!user) return;
+    setSyncingCatalog(true);
+    setStatusMessage(null);
+    try {
+      const summary = await syncReferenceCatalogToFirestore(user.uid);
+      await loadAllFoods();
+      setStatusMessage({
+        tone: 'success',
+        text: `Đã đồng bộ thư viện chuẩn (${VIETNAMESE_FOOD_CATALOG.length} món) lên Firestore: tạo mới ${summary.created}, cập nhật ${summary.updated}.`,
+      });
+    } catch (err) {
+      setStatusMessage({
+        tone: 'danger',
+        text: formatFirestoreUiErrorVi(err),
+      });
+    } finally {
+      setSyncingCatalog(false);
+    }
+  };
 
   const handleSaveFood = async (input: FoodInput, isExisting: boolean) => {
     if (!user) return;
@@ -243,21 +268,31 @@ export function AdminFoodsPage() {
             Quản trị kho dữ liệu thực phẩm
           </h1>
           <p className="text-sm text-slate-600">
-            Thêm, chỉnh sửa, xóa mềm hoặc nhập hàng loạt từ tệp JSON/CSV bạn cung
-            cấp. Mọi dòng phải vượt qua kiểm định schema trước khi ghi vào Firestore.
+            Thêm, chỉnh sửa, ẩn món ăn, đồng bộ danh mục Việt Nam chuẩn hoặc nhập hàng
+            loạt từ tệp JSON/CSV.
           </p>
         </div>
 
-        <Button
-          variant="primary"
-          onClick={() => {
-            setEditingFood(null);
-            setModalOpen(true);
-          }}
-          leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}
-        >
-          Thêm thực phẩm
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            isLoading={syncingCatalog}
+            onClick={handleSyncReferenceCatalog}
+            leftIcon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
+          >
+            Đồng bộ {VIETNAMESE_FOOD_CATALOG.length} món chuẩn lên Firestore
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => {
+              setEditingFood(null);
+              setModalOpen(true);
+            }}
+            leftIcon={<Plus className="h-4 w-4" aria-hidden="true" />}
+          >
+            Thêm thực phẩm
+          </Button>
+        </div>
       </div>
 
       <Tabs

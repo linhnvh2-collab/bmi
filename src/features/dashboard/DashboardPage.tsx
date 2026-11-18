@@ -1,12 +1,16 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Activity,
   BookOpen,
   Calculator,
   Calendar,
+  Camera,
   FileText,
   Flame,
+  Layers,
   ShoppingCart,
+  Sparkles,
   Target,
   UserCircle2,
   Utensils,
@@ -27,12 +31,14 @@ import {
   ACTIVITY_LEVEL_OPTIONS,
   BMI_CATEGORY_METADATA,
 } from '@/src/lib/calculations';
+import { subscribeMealPlans } from '@/src/lib/firebase/mealPlansService';
 import {
   calculateAgeFromBirthYear,
   formatVietnameseDate,
   formatVietnameseDateTime,
 } from '@/src/lib/format/date';
 import { GOAL_TYPE_LABELS } from '@/src/lib/safety';
+import type { SavedMealPlan } from '@/src/types/mealPlan';
 
 export function DashboardPage() {
   const {
@@ -47,6 +53,18 @@ export function DashboardPage() {
     currentGoal,
   } = useAuth();
 
+  const [savedPlans, setSavedPlans] = useState<SavedMealPlan[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    const unsub = subscribeMealPlans(
+      user.uid,
+      (plans) => setSavedPlans(plans),
+      () => setSavedPlans([])
+    );
+    return () => unsub();
+  }, [user]);
+
   const latestRecord = healthRecords[0] ?? null;
   const profileAge = profile ? calculateAgeFromBirthYear(profile.birthYear) : null;
   const isUnder18 =
@@ -60,6 +78,9 @@ export function DashboardPage() {
     ? ACTIVITY_LEVEL_OPTIONS.find((opt) => opt.value === profile.activityLevel)
         ?.labelVi ?? '—'
     : 'Chưa thiết lập';
+
+  const latestPlan = savedPlans[0] ?? null;
+  const latestPlanDay = latestPlan?.days[0] ?? null;
 
   return (
     <div className="space-y-6">
@@ -80,12 +101,20 @@ export function DashboardPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          <Link to="/bmi">
+          <Link to="/meal-planner">
             <Button
               variant="primary"
+              leftIcon={<Sparkles className="h-4 w-4" aria-hidden="true" />}
+            >
+              Thực đơn AI
+            </Button>
+          </Link>
+          <Link to="/bmi">
+            <Button
+              variant="outline"
               leftIcon={<Calculator className="h-4 w-4" aria-hidden="true" />}
             >
-              Đo &amp; lưu BMI mới
+              Đo &amp; lưu BMI
             </Button>
           </Link>
           <Link to="/profile">
@@ -93,7 +122,7 @@ export function DashboardPage() {
               variant="outline"
               leftIcon={<UserCircle2 className="h-4 w-4" aria-hidden="true" />}
             >
-              Cập nhật hồ sơ
+              Hồ sơ
             </Button>
           </Link>
         </div>
@@ -129,7 +158,7 @@ export function DashboardPage() {
         </Alert>
       )}
 
-      {/* KPI Row (Real data only or explicit 'Chưa có dữ liệu') */}
+      {/* KPI Row */}
       {recordsLoading || profileLoading ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Skeleton className="h-32 w-full" />
@@ -193,11 +222,101 @@ export function DashboardPage() {
             caption={
               profile
                 ? `Sở thích: ${profile.dietaryPreferences.length} · Dị ứng: ${profile.allergens.length}`
-                : 'Lưu sẵn cho giai đoạn lập thực đơn sau'
+                : 'Lưu sẵn cho thực đơn cá nhân'
             }
           />
         </div>
       )}
+
+      {/* Active AI Meal Plan + Quick Feature Links */}
+      <Card className="space-y-4">
+        <div className="flex flex-col gap-3 border-b border-slate-200 pb-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-forest-700" aria-hidden="true" />
+            <h2 className="text-base font-semibold text-slate-900">
+              {latestPlan ? `Thực đơn AI hiện tại: ${latestPlan.title}` : 'Thực đơn AI & Công cụ dinh dưỡng nhanh'}
+            </h2>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Link to="/nutrition-plan">
+              <Button size="sm" variant="outline">
+                Kế hoạch dinh dưỡng
+              </Button>
+            </Link>
+            <Link to="/nutrients">
+              <Button
+                size="sm"
+                variant="outline"
+                leftIcon={<Layers className="h-3.5 w-3.5" aria-hidden="true" />}
+              >
+                9 nhóm chất
+              </Button>
+            </Link>
+            <Link to="/scanner">
+              <Button
+                size="sm"
+                variant="outline"
+                leftIcon={<Camera className="h-3.5 w-3.5" aria-hidden="true" />}
+              >
+                Quét ảnh món
+              </Button>
+            </Link>
+          </div>
+        </div>
+
+        {latestPlan && latestPlanDay ? (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
+              <span>
+                <strong>{latestPlanDay.dayLabelVi}</strong> ·{' '}
+                {latestPlanDay.dailyTotals.energyKcal !== null
+                  ? `~${latestPlanDay.dailyTotals.energyKcal.toLocaleString('vi-VN')} kcal (Ước tính)`
+                  : 'Chế độ thói quen lành mạnh'}
+              </span>
+              <Link
+                to="/meal-planner"
+                className="font-semibold text-forest-800 hover:underline"
+              >
+                Mở chi tiết &amp; Đổi món →
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              {latestPlanDay.meals.map((slot) => (
+                <div
+                  key={slot.slotType}
+                  className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 space-y-1"
+                >
+                  <p className="text-xs font-semibold text-forest-900">
+                    {slot.labelVi}
+                  </p>
+                  <p className="text-xs text-slate-700 line-clamp-2">
+                    {slot.dishes.map((d) => d.nameVi).join(', ')}
+                  </p>
+                  <p className="font-mono text-[11px] text-slate-500">
+                    {slot.totals.energyKcal !== null
+                      ? `~${slot.totals.energyKcal} kcal`
+                      : '—'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-slate-600">
+              Chưa có thực đơn AI nào được tạo. Hãy tạo thực đơn 1, 3 hoặc 7 ngày phù
+              hợp với thể trạng và sở thích Việt Nam của bạn.
+            </p>
+            <Link to="/meal-planner" className="shrink-0">
+              <Button size="sm" variant="primary">
+                Tạo thực đơn AI ngay
+              </Button>
+            </Link>
+          </div>
+        )}
+      </Card>
 
       {/* Main Content Split: Chart + Context Cards */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
@@ -266,7 +385,10 @@ export function DashboardPage() {
                     >
                       <div className="min-w-0 space-y-0.5">
                         <div className="flex items-center gap-1.5 text-slate-700 font-medium">
-                          <Calendar className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
+                          <Calendar
+                            className="h-3.5 w-3.5 text-slate-400"
+                            aria-hidden="true"
+                          />
                           <span>{formatVietnameseDateTime(rec.createdAt)}</span>
                         </div>
                         <p className="text-slate-500 font-mono tabular-nums">
@@ -309,9 +431,9 @@ export function DashboardPage() {
                   Mở Kho thực phẩm
                 </Button>
               </Link>
-              <Link to="/profile">
+              <Link to="/nutrients">
                 <Button size="sm" variant="outline">
-                  Cập nhật dị ứng
+                  9 nhóm dinh dưỡng
                 </Button>
               </Link>
             </div>
@@ -332,7 +454,8 @@ export function DashboardPage() {
               </p>
             ) : currentGoal ? (
               <p className="text-xs leading-relaxed text-slate-600">
-                Mục tiêu hiện tại: <strong>{GOAL_TYPE_LABELS[currentGoal.goalType]}</strong>
+                Mục tiêu hiện tại:{' '}
+                <strong>{GOAL_TYPE_LABELS[currentGoal.goalType]}</strong>
                 {currentGoal.targetKcal !== null && (
                   <>
                     {' '}
@@ -387,7 +510,9 @@ export function DashboardPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  leftIcon={<ShoppingCart className="h-3.5 w-3.5" aria-hidden="true" />}
+                  leftIcon={
+                    <ShoppingCart className="h-3.5 w-3.5" aria-hidden="true" />
+                  }
                 >
                   Đi chợ
                 </Button>

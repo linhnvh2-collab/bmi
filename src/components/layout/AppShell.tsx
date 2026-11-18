@@ -4,14 +4,17 @@ import {
   Activity,
   BookOpen,
   Calculator,
+  Camera,
   Flame,
   Home,
+  Layers,
   LayoutDashboard,
   LogIn,
   LogOut,
   Menu,
   ShieldCheck,
   ShoppingCart,
+  Sparkles,
   Target,
   UserCircle2,
   Utensils,
@@ -30,7 +33,11 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Trang chủ', icon: Home },
   { to: '/bmi', label: 'Tính BMI', icon: Calculator },
   { to: '/energy', label: 'Năng lượng BMR/TDEE', icon: Flame },
+  { to: '/nutrition-plan', label: 'Kế hoạch dinh dưỡng', icon: Sparkles },
   { to: '/foods', label: 'Thực phẩm Việt', icon: Utensils },
+  { to: '/nutrients', label: '9 nhóm dinh dưỡng', icon: Layers },
+  { to: '/meal-planner', label: 'Thực đơn AI', icon: Sparkles },
+  { to: '/scanner', label: 'Quét ảnh món ăn', icon: Camera },
   { to: '/goals', label: 'Mục tiêu', icon: Target },
   { to: '/diary', label: 'Nhật ký ăn uống', icon: BookOpen },
   { to: '/shopping-list', label: 'Danh sách đi chợ', icon: ShoppingCart },
@@ -40,8 +47,8 @@ const NAV_ITEMS: NavItem[] = [
 
 const MOBILE_BOTTOM_NAV_PATHS = new Set([
   '/',
-  '/bmi',
   '/foods',
+  '/meal-planner',
   '/diary',
   '/dashboard',
 ]);
@@ -50,7 +57,11 @@ const ROUTE_TITLES: Record<string, string> = {
   '/': 'Trang chủ',
   '/bmi': 'Công cụ tính BMI',
   '/energy': 'Ước tính BMR / TDEE',
+  '/nutrition-plan': 'Kế hoạch dinh dưỡng cá nhân',
   '/foods': 'Kho thực phẩm Việt Nam',
+  '/nutrients': '9 nhóm nhu cầu dinh dưỡng',
+  '/meal-planner': 'Thực đơn AI cá nhân hóa',
+  '/scanner': 'Quét ảnh món ăn',
   '/goals': 'Mục tiêu dinh dưỡng',
   '/diary': 'Nhật ký ăn uống',
   '/shopping-list': 'Danh sách đi chợ',
@@ -88,11 +99,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             to="/"
             className="text-sm font-bold tracking-tight text-forest-900 whitespace-nowrap shrink-0"
           >
-            Dinh Dưỡng Việt
+            VitaMeal AI · Việt Nam
           </Link>
         </div>
 
-        <nav aria-label="Điều hướng chính" className="flex-1 space-y-1 p-4">
+        <nav aria-label="Điều hướng chính" className="flex-1 space-y-1 p-4 overflow-y-auto">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
             return (
@@ -101,7 +112,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 to={item.to}
                 end={item.to === '/'}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-lg px-3.5 py-2.5 text-sm font-medium whitespace-nowrap transition-colors duration-150 ${
+                  `flex items-center gap-3 rounded-lg px-3.5 py-2 text-sm font-medium whitespace-nowrap transition-colors duration-150 ${
                     isActive
                       ? 'bg-forest-50 text-forest-900 border border-forest-200'
                       : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-transparent'
@@ -121,7 +132,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <NavLink
                 to="/admin/foods"
                 className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-lg px-3.5 py-2.5 text-sm font-medium whitespace-nowrap transition-colors duration-150 ${
+                  `flex items-center gap-3 rounded-lg px-3.5 py-2 text-sm font-medium whitespace-nowrap transition-colors duration-150 ${
                     isActive
                       ? 'bg-forest-50 text-forest-900 border border-forest-200'
                       : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-transparent'
@@ -176,7 +187,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Main Column */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Top Bar (Clean 3-zone / workspace breadcrumb + single primary CTA) */}
+        {/* Top Bar */}
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b border-slate-200 bg-white/95 px-4 sm:px-6 backdrop-blur-xs">
           <div className="flex items-center gap-3 min-w-0">
             <button
@@ -192,7 +203,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 to="/"
                 className="text-sm font-bold text-forest-900 whitespace-nowrap lg:hidden"
               >
-                Dinh Dưỡng Việt
+                VitaMeal AI
               </Link>
               <span className="text-slate-300 lg:hidden" aria-hidden="true">
                 /
@@ -237,7 +248,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="relative z-10 flex w-72 max-w-[85vw] flex-col bg-white border-r border-slate-200 shadow-xl">
               <div className="flex h-16 items-center justify-between border-b border-slate-200 px-5">
                 <span className="text-sm font-bold text-forest-900">
-                  BMI &amp; Meal Planner
+                  VitaMeal AI · Việt Nam
                 </span>
                 <button
                   type="button"
@@ -248,7 +259,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <X className="h-5 w-5" aria-hidden="true" />
                 </button>
               </div>
-              <nav className="flex-1 space-y-1 p-4">
+              <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
                 {NAV_ITEMS.map((item) => {
                   const Icon = item.icon;
                   return (
@@ -258,7 +269,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                       end={item.to === '/'}
                       onClick={() => setMobileMenuOpen(false)}
                       className={({ isActive }) =>
-                        `flex items-center gap-3 rounded-lg px-3.5 py-3 text-sm font-medium ${
+                        `flex items-center gap-3 rounded-lg px-3.5 py-2.5 text-sm font-medium ${
                           isActive
                             ? 'bg-forest-50 text-forest-900 border border-forest-200'
                             : 'text-slate-700 hover:bg-slate-50'
@@ -276,7 +287,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                       to="/admin/foods"
                       onClick={() => setMobileMenuOpen(false)}
                       className={({ isActive }) =>
-                        `flex items-center gap-3 rounded-lg px-3.5 py-3 text-sm font-medium ${
+                        `flex items-center gap-3 rounded-lg px-3.5 py-2.5 text-sm font-medium ${
                           isActive
                             ? 'bg-forest-50 text-forest-900 border border-forest-200'
                             : 'text-slate-700 hover:bg-slate-50'
@@ -324,14 +335,15 @@ export function AppShell({ children }: { children: ReactNode }) {
         <footer className="hidden lg:block border-t border-slate-200 bg-white px-8 py-4 text-xs text-slate-500">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
             <span>
-              BMI &amp; AI Vietnamese Meal Planner · Công cụ học tập dinh dưỡng Việt Nam
+              VitaMeal AI · BMI &amp; AI Vietnamese Meal Planner · Công cụ học tập dinh
+              dưỡng Việt Nam
             </span>
             <span>Đơn vị chuẩn: cm · kg · kcal</span>
           </div>
         </footer>
       </div>
 
-      {/* Mobile Bottom Navigation (single-line labels, <= 15% mobile viewport height) */}
+      {/* Mobile Bottom Navigation */}
       <nav
         aria-label="Điều hướng di động"
         className="fixed bottom-0 left-0 right-0 z-30 grid grid-cols-5 border-t border-slate-200 bg-white/95 backdrop-blur-xs lg:hidden"
@@ -342,10 +354,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             const shortLabel =
               item.to === '/foods'
                 ? 'Thực phẩm'
-                : item.to === '/diary'
-                  ? 'Nhật ký'
-                  : item.to === '/bmi'
-                    ? 'BMI'
+                : item.to === '/meal-planner'
+                  ? 'Thực đơn'
+                  : item.to === '/diary'
+                    ? 'Nhật ký'
                     : item.label;
             return (
               <NavLink

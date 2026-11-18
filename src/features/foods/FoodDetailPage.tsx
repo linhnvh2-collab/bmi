@@ -2,14 +2,19 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
+  ArrowLeftRight,
   BookOpen,
+  ChefHat,
   Heart,
+  Layers,
   ShieldAlert,
   Utensils,
 } from 'lucide-react';
 import { useAuth } from '@/src/app/providers/AuthProvider';
+import { FoodSubstitutionCompareTable } from '@/src/components/nutrition/FoodSubstitutionCompareTable';
 import {
   Alert,
+  Badge,
   Button,
   Card,
   DisclaimerBanner,
@@ -17,12 +22,15 @@ import {
   Skeleton,
 } from '@/src/components/ui';
 import { formatFirestoreUiErrorVi } from '@/src/lib/firebase/errors';
-import { fetchFoodById } from '@/src/lib/firebase/foodsService';
+import { fetchFoodById, fetchFoods } from '@/src/lib/firebase/foodsService';
 import {
   ALLERGEN_DISCLAIMER_VI,
   DIET_TAG_LABELS,
   findMatchingAllergens,
+  findSimilarFoods,
   FOOD_CATEGORY_LABELS,
+  getFoodNutrientGroups,
+  NUTRIENT_NEED_GROUP_MAP,
   scaleNutrients,
   VERIFICATION_STATUS_METADATA,
 } from '@/src/lib/nutrition';
@@ -40,6 +48,7 @@ export function FoodDetailPage() {
   const { user, profile, favoriteIds, toggleFavorite } = useAuth();
 
   const [food, setFood] = useState<FoodItem | null>(null);
+  const [catalogFoods, setCatalogFoods] = useState<FoodItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [imgError, setImgError] = useState(false);
@@ -55,10 +64,15 @@ export function FoodDetailPage() {
     const load = async () => {
       setLoading(true);
       setError(null);
+      setImgError(false);
       try {
-        const item = await fetchFoodById(id);
+        const [item, allItems] = await Promise.all([
+          fetchFoodById(id),
+          fetchFoods({ includeInactive: false }).catch(() => [] as FoodItem[]),
+        ]);
         if (!active) return;
         setFood(item);
+        setCatalogFoods(allItems);
         if (item) {
           const initialGrams =
             item.servingUnits.length > 0 ? item.servingUnits[0].grams : 100;
@@ -90,6 +104,18 @@ export function FoodDetailPage() {
     if (!food) return [];
     return findMatchingAllergens(food.allergens, userAllergens);
   }, [food, userAllergens]);
+
+  const nutrientGroups = useMemo(() => {
+    if (!food) return [];
+    return getFoodNutrientGroups(food)
+      .map((gid) => NUTRIENT_NEED_GROUP_MAP.get(gid))
+      .filter((m): m is NonNullable<typeof m> => Boolean(m));
+  }, [food]);
+
+  const similarFoods = useMemo(() => {
+    if (!food || catalogFoods.length === 0) return [];
+    return findSimilarFoods(food, catalogFoods, userAllergens, 4);
+  }, [food, catalogFoods, userAllergens]);
 
   const handleToggleFavorite = async () => {
     if (!food) return;
@@ -208,7 +234,7 @@ export function FoodDetailPage() {
                 {FOOD_CATEGORY_LABELS[food.category]}
               </p>
               <p className="text-[11px] text-slate-500">
-                Chưa có hình ảnh tĩnh cho món ăn này
+                Chưa có ảnh món ăn
               </p>
             </div>
           )}
@@ -279,6 +305,43 @@ export function FoodDetailPage() {
                     .map((tag) => DIET_TAG_LABELS[tag] ?? tag)
                     .join(' · ')}
                 </span>
+              </div>
+            )}
+
+            {/* Nutrient Need Groups */}
+            {nutrientGroups.length > 0 && (
+              <div className="space-y-2 border-t border-slate-200 pt-3.5">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                  <Layers className="h-3.5 w-3.5 text-forest-700" aria-hidden="true" />
+                  <span>Nhóm nhu cầu dinh dưỡng liên quan</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {nutrientGroups.map((grp) => (
+                    <Link key={grp.id} to={`/foods?group=${grp.id}`}>
+                      <Badge tone={grp.tone}>{grp.labelVi}</Badge>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Ingredients & Preparation Note */}
+            {(food.ingredients?.length || food.preparationNote) && (
+              <div className="space-y-2.5 border-t border-slate-200 pt-3.5">
+                <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
+                  <ChefHat className="h-4 w-4 text-forest-700" aria-hidden="true" />
+                  <span>Thành phần &amp; Cách chế biến tham khảo</span>
+                </div>
+                {food.ingredients && food.ingredients.length > 0 && (
+                  <p className="text-xs leading-relaxed text-slate-700">
+                    <strong>Thành phần chính:</strong> {food.ingredients.join(', ')}.
+                  </p>
+                )}
+                {food.preparationNote && (
+                  <p className="text-xs leading-relaxed text-slate-600">
+                    <strong>Ghi chú chế biến:</strong> {food.preparationNote}
+                  </p>
+                )}
               </div>
             )}
 
@@ -356,6 +419,79 @@ export function FoodDetailPage() {
         portionGrams={portionGrams ?? undefined}
         isEstimated={food.verificationStatus !== 'verified'}
       />
+
+      {/* Smart Substitution Comparison */}
+      <FoodSubstitutionCompareTable
+        targetFood={food}
+        targetPortionGrams={portionGrams ?? food.servingUnits[0]?.grams ?? 100}
+        catalogFoods={catalogFoods}
+        excludedAllergens={userAllergens}
+        dislikedFoods={profile?.dislikedFoods ?? []}
+        nutritionGoal={profile?.nutritionGoal ?? 'nutrition_balance'}
+        budgetLevel={profile?.budgetLevel ?? 'standard'}
+      />
+
+      {/* Similar Substitute Suggestions */}
+      {similarFoods.length > 0 && (
+        <Card className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
+            <div className="flex items-center gap-2">
+              <ArrowLeftRight
+                className="h-4 w-4 text-forest-700"
+                aria-hidden="true"
+              />
+              <h2 className="text-base font-semibold text-slate-900">
+                Gợi ý món ăn thay thế tương đương
+              </h2>
+            </div>
+            <span className="text-xs text-slate-500">
+              {userAllergens.length > 0
+                ? 'Đã tự động loại trừ các chất dị ứng trong hồ sơ'
+                : 'Dựa trên mức năng lượng và chất đạm trên 100g'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {similarFoods.map((alt) => (
+              <Link
+                key={alt.id}
+                to={`/foods/${alt.id}`}
+                className="group rounded-xl border border-slate-200 bg-white overflow-hidden hover:border-forest-400 transition-colors"
+              >
+                {alt.imagePath ? (
+                  <div className="aspect-[4/3] w-full overflow-hidden bg-slate-100 border-b border-slate-200">
+                    <img
+                      src={alt.imagePath}
+                      alt={alt.nameVi}
+                      loading="lazy"
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-1 border-b border-slate-200 bg-forest-50/40 px-3 text-center">
+                    <Utensils
+                      className="h-5 w-5 text-forest-700"
+                      aria-hidden="true"
+                    />
+                    <span className="text-[11px] text-slate-500">
+                      Chưa có ảnh món ăn
+                    </span>
+                  </div>
+                )}
+                <div className="p-3 space-y-1.5">
+                  <p className="text-sm font-semibold text-slate-900 group-hover:text-forest-800 line-clamp-1">
+                    {alt.nameVi}
+                  </p>
+                  <p className="font-mono text-xs text-slate-600 tabular-nums">
+                    {alt.nutrientsPer100g.energyKcal ?? '—'} kcal · Đạm{' '}
+                    {alt.nutrientsPer100g.proteinG ?? '—'}g / 100g
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <DisclaimerBanner />
     </div>
