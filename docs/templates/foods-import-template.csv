@@ -1,0 +1,2 @@
+id,nameVi,nameEn,aliases,category,energyKcal,proteinG,fatG,carbG,fiberG,sugarG,sodiumMg,servingUnits,allergens,allergensReviewed,dietTags,verificationStatus,sourceName,sourceYear,sourceReference,imagePath,isActive
+"vi-du-khong-dung-that","Món mẫu minh họa định dạng (KHÔNG nhập thật)","Format example only","Tên gọi khác 1;Tên gọi khác 2",rice_noodles,100,2.5,1.0,20.0,1.2,,150,"1 phần mẫu:100|1 chén mẫu:150","Gluten (lúa mì)",false,"vegetarian",unverified,"Tên nguồn tham khảo",2024,"Mã hoặc số trang","",true

@@ -1,0 +1,468 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Hồ sơ cá nhân và chỉ số cơ bản của người dùng được lưu theo sự đồng ý (Nghị định 13/2023/NĐ-CP).",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Mã định danh Firebase Auth UID của chủ sở hữu.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Tên hiển thị của người dùng.",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Địa chỉ email của người dùng.",
+          "maxLength": 254
+        },
+        "birthYear": {
+          "type": "number",
+          "description": "Năm sinh (1900–2021)."
+        },
+        "sex": {
+          "type": "string",
+          "description": "Giới tính sinh học phục vụ công thức tham khảo.",
+          "enum": ["male", "female", "other"]
+        },
+        "heightCm": {
+          "type": "number",
+          "description": "Chiều cao tính bằng cm (100–250)."
+        },
+        "weightKg": {
+          "type": "number",
+          "description": "Cân nặng tính bằng kg (15–300)."
+        },
+        "activityLevel": {
+          "type": "string",
+          "description": "Mức độ vận động lưu sẵn cho các giai đoạn sau.",
+          "enum": ["sedentary", "light", "moderate", "active", "very_active"]
+        },
+        "dietaryPreferences": {
+          "type": "array",
+          "description": "Danh sách sở thích ăn uống (tối đa 15 mục)."
+        },
+        "allergens": {
+          "type": "array",
+          "description": "Danh sách thực phẩm dị ứng hoặc cần tránh (tối đa 20 mục)."
+        },
+        "consentAccepted": {
+          "type": "boolean",
+          "description": "Xác nhận đồng ý lưu trữ dữ liệu sức khỏe theo Nghị định 13/2023/NĐ-CP."
+        },
+        "consentVersion": {
+          "type": "string",
+          "description": "Phiên bản điều khoản đồng ý.",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "consentAcceptedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Thời điểm người dùng xác nhận đồng ý (Firestore Timestamp)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Thời điểm tạo hồ sơ (serverTimestamp)."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Thời điểm cập nhật hồ sơ gần nhất (serverTimestamp)."
+        }
+      },
+      "required": [
+        "uid",
+        "displayName",
+        "email",
+        "birthYear",
+        "sex",
+        "heightCm",
+        "weightKg",
+        "activityLevel",
+        "dietaryPreferences",
+        "allergens",
+        "consentAccepted",
+        "consentVersion",
+        "consentAcceptedAt",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "HealthRecord": {
+      "title": "HealthRecord",
+      "description": "Bản ghi lịch sử đo BMI của người dùng.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID của chủ sở hữu bản ghi.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "age": {
+          "type": "number",
+          "description": "Tuổi tại thời điểm đo (5–120)."
+        },
+        "heightCm": {
+          "type": "number",
+          "description": "Chiều cao tại thời điểm đo (120–230 cm)."
+        },
+        "weightKg": {
+          "type": "number",
+          "description": "Cân nặng tại thời điểm đo (20–300 kg)."
+        },
+        "bmi": {
+          "type": "number",
+          "description": "Chỉ số BMI đã làm tròn 1 chữ số thập phân."
+        },
+        "isUnder18": {
+          "type": "boolean",
+          "description": "Đánh dấu chế độ giới hạn cho người dưới 18 tuổi."
+        },
+        "categoryKey": {
+          "type": "string",
+          "description": "Khóa phân loại BMI (under_18_limited nếu dưới 18 tuổi).",
+          "enum": ["underweight", "normal", "overweight", "obese", "under_18_limited"]
+        },
+        "note": {
+          "type": "string",
+          "description": "Ghi chú ngắn tùy chọn.",
+          "maxLength": 300
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Thời điểm ghi nhận (serverTimestamp)."
+        }
+      },
+      "required": [
+        "userId",
+        "age",
+        "heightCm",
+        "weightKg",
+        "bmi",
+        "isUnder18",
+        "categoryKey",
+        "note",
+        "createdAt"
+      ]
+    },
+    "FoodItem": {
+      "title": "FoodItem",
+      "description": "Thực phẩm và món ăn Việt Nam trong kho dữ liệu dinh dưỡng công khai (chỉ admin có quyền ghi).",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Slug định danh ổn định của thực phẩm.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "nameVi": {
+          "type": "string",
+          "description": "Tên tiếng Việt của thực phẩm.",
+          "minLength": 1,
+          "maxLength": 150
+        },
+        "nameEn": {
+          "type": "string",
+          "description": "Tên tiếng Anh tùy chọn.",
+          "maxLength": 150
+        },
+        "aliases": {
+          "type": "array",
+          "description": "Tên gọi vùng miền hoặc biến thể chính tả."
+        },
+        "nameNormalized": {
+          "type": "string",
+          "description": "Tên chuẩn hóa không dấu phục vụ tìm kiếm.",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "category": {
+          "type": "string",
+          "description": "Nhóm thực phẩm.",
+          "enum": [
+            "rice_noodles",
+            "meat",
+            "fish_seafood",
+            "eggs_dairy",
+            "vegetables",
+            "fruits",
+            "legumes_nuts",
+            "soups",
+            "snacks",
+            "drinks",
+            "condiments"
+          ]
+        },
+        "nutrientsPer100g": {
+          "type": "object",
+          "description": "Giá trị dinh dưỡng trên 100g (null nếu chưa có dữ liệu)."
+        },
+        "servingUnits": {
+          "type": "array",
+          "description": "Các đơn vị khẩu phần quy đổi sang gram."
+        },
+        "allergens": {
+          "type": "array",
+          "description": "Danh sách chất gây dị ứng liên quan."
+        },
+        "allergensReviewed": {
+          "type": "boolean",
+          "description": "Đánh dấu thông tin dị ứng đã được rà soát hay chưa."
+        },
+        "dietTags": {
+          "type": "array",
+          "description": "Nhãn chế độ ăn (chay, không gluten, v.v.)."
+        },
+        "source": {
+          "type": "object",
+          "description": "Nguồn tham khảo dữ liệu dinh dưỡng (bắt buộc khi verificationStatus là verified)."
+        },
+        "verificationStatus": {
+          "type": "string",
+          "description": "Mức độ xác minh của dữ liệu.",
+          "enum": ["verified", "estimated", "unverified"]
+        },
+        "imagePath": {
+          "type": "string",
+          "description": "Đường dẫn ảnh tĩnh nội bộ dưới /images/foods/ nếu có.",
+          "maxLength": 250
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Trạng thái hiển thị (false = xóa mềm)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Thời điểm tạo (serverTimestamp)."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Thời điểm cập nhật gần nhất (serverTimestamp)."
+        },
+        "updatedBy": {
+          "type": "string",
+          "description": "UID của quản trị viên cập nhật gần nhất.",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "required": [
+        "id",
+        "nameVi",
+        "nameEn",
+        "aliases",
+        "nameNormalized",
+        "category",
+        "nutrientsPer100g",
+        "servingUnits",
+        "allergens",
+        "allergensReviewed",
+        "dietTags",
+        "source",
+        "verificationStatus",
+        "imagePath",
+        "isActive",
+        "createdAt",
+        "updatedAt",
+        "updatedBy"
+      ]
+    },
+    "FavoriteFood": {
+      "title": "FavoriteFood",
+      "description": "Món ăn yêu thích được lưu riêng theo người dùng.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID của chủ sở hữu.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "foodId": {
+          "type": "string",
+          "description": "ID thực phẩm được đánh dấu yêu thích.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Thời điểm đánh dấu yêu thích (serverTimestamp)."
+        }
+      },
+      "required": ["userId", "foodId", "createdAt"]
+    },
+    "UserGoal": {
+      "title": "UserGoal",
+      "description": "Mục tiêu dinh dưỡng hiện tại của người dùng trưởng thành (không lưu câu trả lời sàng lọc y tế).",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID của chủ sở hữu.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "goalType": {
+          "type": "string",
+          "description": "Loại mục tiêu.",
+          "enum": ["maintain", "lose_gradual", "gain_gradual", "healthy_habits"]
+        },
+        "startDate": {
+          "type": "string",
+          "description": "Ngày bắt đầu (YYYY-MM-DD).",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "startWeightKg": {
+          "type": "number",
+          "description": "Cân nặng ban đầu (kg, 20–300)."
+        },
+        "targetWeightKg": {
+          "type": "number",
+          "description": "Cân nặng mục tiêu tùy chọn (kg, 20–300 hoặc null)."
+        },
+        "weeklyChangeKg": {
+          "type": "number",
+          "description": "Tốc độ thay đổi cân nặng hàng tuần sau khi kẹp an toàn (0–0.5 kg)."
+        },
+        "targetKcal": {
+          "type": "number",
+          "description": "Mục tiêu năng lượng hàng ngày (kcal, 1200–6000 hoặc null với healthy_habits)."
+        },
+        "educationalConfirmed": {
+          "type": "boolean",
+          "description": "Xác nhận hiểu đây là thông tin tham khảo mang tính giáo dục."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Thời điểm tạo mục tiêu (serverTimestamp)."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Thời điểm cập nhật gần nhất (serverTimestamp)."
+        }
+      },
+      "required": [
+        "userId",
+        "goalType",
+        "startDate",
+        "startWeightKg",
+        "targetWeightKg",
+        "weeklyChangeKg",
+        "targetKcal",
+        "educationalConfirmed",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "FoodDiaryDay": {
+      "title": "FoodDiaryDay",
+      "description": "Nhật ký ăn uống theo ngày (1 tài liệu/ngày để tiết kiệm lượt ghi Spark).",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID của chủ sở hữu.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "date": {
+          "type": "string",
+          "description": "Ngày nhật ký (YYYY-MM-DD).",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "entries": {
+          "type": "array",
+          "description": "Danh sách món ăn trong ngày (tối đa 60 mục, lưu snapshot dinh dưỡng tại thời điểm ghi)."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Thời điểm cập nhật gần nhất (serverTimestamp)."
+        }
+      },
+      "required": ["userId", "date", "entries", "updatedAt"]
+    },
+    "ShoppingList": {
+      "title": "ShoppingList",
+      "description": "Danh sách mua sắm thực phẩm cá nhân (1 tài liệu/người dùng để tiết kiệm lượt ghi Spark).",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID của chủ sở hữu.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "items": {
+          "type": "array",
+          "description": "Danh sách thực phẩm cần mua (tối đa 100 mục)."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Thời điểm cập nhật gần nhất (serverTimestamp)."
+        }
+      },
+      "required": ["userId", "items", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Hồ sơ cá nhân và sự đồng ý xử lý dữ liệu sức khỏe của từng người dùng."
+    },
+    "/users/{userId}/health_records/{recordId}": {
+      "schema": { "$ref": "#/entities/HealthRecord" },
+      "description": "Lịch sử đo chỉ số BMI thuộc sở hữu riêng của từng người dùng."
+    },
+    "/users/{userId}/favorites/{foodId}": {
+      "schema": { "$ref": "#/entities/FavoriteFood" },
+      "description": "Danh sách thực phẩm yêu thích của riêng từng người dùng."
+    },
+    "/foods/{foodId}": {
+      "schema": { "$ref": "#/entities/FoodItem" },
+      "description": "Kho dữ liệu thực phẩm Việt Nam (công khai đọc, chỉ admin có quyền ghi)."
+    },
+    "/users/{userId}/goals/{goalId}": {
+      "schema": { "$ref": "#/entities/UserGoal" },
+      "description": "Mục tiêu dinh dưỡng hiện tại của người dùng trưởng thành (document ID: current)."
+    },
+    "/users/{userId}/food_diaries/{dateKey}": {
+      "schema": { "$ref": "#/entities/FoodDiaryDay" },
+      "description": "Nhật ký ăn uống theo ngày (YYYY-MM-DD) của từng người dùng."
+    },
+    "/users/{userId}/shopping_list/{listId}": {
+      "schema": { "$ref": "#/entities/ShoppingList" },
+      "description": "Danh sách mua sắm thực phẩm của từng người dùng (document ID: current)."
+    }
+  }
+}

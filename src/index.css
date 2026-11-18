@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Be Vietnam Pro", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --color-forest-50: #eff7f2;
+  --color-forest-100: #d9ede0;
+  --color-forest-200: #b6dbc4;
+  --color-forest-300: #85c19e;
+  --color-forest-400: #51a074;
+  --color-forest-500: #2f8257;
+  --color-forest-600: #1f6743;
+  --color-forest-700: #185235;
+  --color-forest-800: #14422c;
+  --color-forest-900: #113725;
+  --color-forest-950: #091e14;
+
+  --color-fresh-50: #f0fdf4;
+  --color-fresh-100: #dcfce7;
+  --color-fresh-500: #22c55e;
+  --color-fresh-600: #16a34a;
+  --color-fresh-700: #15803d;
+
+  --color-warm-50: #fefce8;
+  --color-warm-100: #fef9c3;
+  --color-warm-200: #fef08a;
+  --color-warm-400: #facc15;
+  --color-warm-500: #eab308;
+  --color-warm-600: #ca8a04;
+  --color-warm-700: #a16207;
+  --color-warm-800: #854d0e;
+
+  --color-canvas: #f8faf9;
+  --color-surface: #ffffff;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    background-color: var(--color-canvas);
+    color: #0f172a;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}

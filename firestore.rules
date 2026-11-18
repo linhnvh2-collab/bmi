@@ -1,0 +1,668 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Admin is determined strictly by Firebase Auth custom claim `admin: true`
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.admin == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidDateKey(dateKey) {
+      return dateKey is string && dateKey.size() == 10 && dateKey.matches('^\\d{4}-\\d{2}-\\d{2}$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidStringList(arr, maxLen) {
+      return arr is list
+        && arr.size() <= maxLen
+        && (arr.size() == 0 || (arr[0] is string && arr[0].size() >= 1 && arr[0].size() <= 60));
+    }
+
+    // Stage 1: UserProfile & HealthRecord validation helpers
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll([
+          'uid',
+          'displayName',
+          'email',
+          'birthYear',
+          'sex',
+          'heightCm',
+          'weightKg',
+          'activityLevel',
+          'dietaryPreferences',
+          'allergens',
+          'consentAccepted',
+          'consentVersion',
+          'consentAcceptedAt',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid',
+          'displayName',
+          'email',
+          'birthYear',
+          'sex',
+          'heightCm',
+          'weightKg',
+          'activityLevel',
+          'dietaryPreferences',
+          'allergens',
+          'consentAccepted',
+          'consentVersion',
+          'consentAcceptedAt',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.uid is string
+        && data.uid.size() >= 1
+        && data.uid.size() <= 128
+        && data.uid.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.uid == userId
+        && data.uid == request.auth.uid
+        && data.displayName is string
+        && data.displayName.size() >= 1
+        && data.displayName.size() <= 100
+        && data.email is string
+        && data.email.size() <= 254
+        && data.birthYear is number
+        && data.birthYear >= 1900
+        && data.birthYear <= 2021
+        && data.sex in ['male', 'female', 'other']
+        && data.heightCm is number
+        && data.heightCm >= 100
+        && data.heightCm <= 250
+        && data.weightKg is number
+        && data.weightKg >= 15
+        && data.weightKg <= 300
+        && data.activityLevel in ['sedentary', 'light', 'moderate', 'active', 'very_active']
+        && isValidStringList(data.dietaryPreferences, 15)
+        && isValidStringList(data.allergens, 20)
+        && data.consentAccepted == true
+        && data.consentVersion is string
+        && data.consentVersion.size() >= 1
+        && data.consentVersion.size() <= 64
+        && data.consentAcceptedAt is timestamp
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidHealthRecord(data, userId) {
+      return data.keys().hasAll([
+          'userId',
+          'age',
+          'heightCm',
+          'weightKg',
+          'bmi',
+          'isUnder18',
+          'categoryKey',
+          'note',
+          'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'userId',
+          'age',
+          'heightCm',
+          'weightKg',
+          'bmi',
+          'isUnder18',
+          'categoryKey',
+          'note',
+          'createdAt'
+        ])
+        && data.userId is string
+        && data.userId.size() >= 1
+        && data.userId.size() <= 128
+        && data.userId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.userId == userId
+        && data.userId == request.auth.uid
+        && data.age is number
+        && data.age >= 5
+        && data.age <= 120
+        && data.heightCm is number
+        && data.heightCm >= 120
+        && data.heightCm <= 230
+        && data.weightKg is number
+        && data.weightKg >= 20
+        && data.weightKg <= 300
+        && data.bmi is number
+        && data.bmi >= 5
+        && data.bmi <= 100
+        && data.isUnder18 is bool
+        && (
+          (data.age < 18 && data.isUnder18 == true && data.categoryKey == 'under_18_limited')
+          || (data.age >= 18
+            && data.isUnder18 == false
+            && data.categoryKey in ['underweight', 'normal', 'overweight', 'obese'])
+        )
+        && data.note is string
+        && data.note.size() <= 300
+        && data.createdAt is timestamp;
+    }
+
+    // Stage 2: Food & Favorite validation helpers
+    function isNullableNutrient(val, maxVal) {
+      return val == null || (val is number && val >= 0 && val <= maxVal);
+    }
+
+    function isValidNutrientsMap(nutrients) {
+      return nutrients is map
+        && nutrients.keys().hasAll([
+          'energyKcal',
+          'proteinG',
+          'fatG',
+          'carbG',
+          'fiberG',
+          'sugarG',
+          'sodiumMg'
+        ])
+        && nutrients.keys().hasOnly([
+          'energyKcal',
+          'proteinG',
+          'fatG',
+          'carbG',
+          'fiberG',
+          'sugarG',
+          'sodiumMg'
+        ])
+        && isNullableNutrient(nutrients.energyKcal, 900)
+        && isNullableNutrient(nutrients.proteinG, 100)
+        && isNullableNutrient(nutrients.fatG, 100)
+        && isNullableNutrient(nutrients.carbG, 100)
+        && isNullableNutrient(nutrients.fiberG, 100)
+        && isNullableNutrient(nutrients.sugarG, 100)
+        && isNullableNutrient(nutrients.sodiumMg, 40000);
+    }
+
+    function isValidServingUnits(units) {
+      return units is list
+        && units.size() <= 30
+        && (units.size() == 0 || (
+          units[0] is map
+          && units[0].keys().hasAll(['label', 'grams'])
+          && units[0].keys().hasOnly(['label', 'grams'])
+          && units[0].label is string
+          && units[0].label.size() >= 1
+          && units[0].label.size() <= 60
+          && units[0].grams is number
+          && units[0].grams > 0
+          && units[0].grams <= 5000
+        ));
+    }
+
+    function isValidFoodAliases(aliases) {
+      return aliases is list
+        && aliases.size() <= 20
+        && (aliases.size() == 0 || (aliases[0] is string && aliases[0].size() >= 1 && aliases[0].size() <= 100));
+    }
+
+    function isValidVerifiedSource(src) {
+      return src is map
+        && src.keys().hasAll(['name', 'year', 'reference'])
+        && src.keys().hasOnly(['name', 'year', 'reference'])
+        && src.name is string
+        && src.name.size() >= 1
+        && src.name.size() <= 200
+        && src.year is number
+        && src.year >= 1900
+        && src.year <= 2100
+        && src.reference is string
+        && src.reference.size() >= 1
+        && src.reference.size() <= 300;
+    }
+
+    function isValidOptionalSource(src) {
+      return src == null
+        || (src is map
+          && src.keys().hasAll(['name', 'year', 'reference'])
+          && src.keys().hasOnly(['name', 'year', 'reference'])
+          && src.name is string
+          && src.name.size() <= 200
+          && (src.year == null || (src.year is number && src.year >= 1900 && src.year <= 2100))
+          && src.reference is string
+          && src.reference.size() <= 300);
+    }
+
+    function isValidFood(data, foodId) {
+      return data.keys().hasAll([
+          'id',
+          'nameVi',
+          'nameEn',
+          'aliases',
+          'nameNormalized',
+          'category',
+          'nutrientsPer100g',
+          'servingUnits',
+          'allergens',
+          'allergensReviewed',
+          'dietTags',
+          'source',
+          'verificationStatus',
+          'imagePath',
+          'isActive',
+          'createdAt',
+          'updatedAt',
+          'updatedBy'
+        ])
+        && data.keys().hasOnly([
+          'id',
+          'nameVi',
+          'nameEn',
+          'aliases',
+          'nameNormalized',
+          'category',
+          'nutrientsPer100g',
+          'servingUnits',
+          'allergens',
+          'allergensReviewed',
+          'dietTags',
+          'source',
+          'verificationStatus',
+          'imagePath',
+          'isActive',
+          'createdAt',
+          'updatedAt',
+          'updatedBy'
+        ])
+        && isValidId(data.id)
+        && data.id == foodId
+        && data.nameVi is string
+        && data.nameVi.size() >= 1
+        && data.nameVi.size() <= 150
+        && data.nameEn is string
+        && data.nameEn.size() <= 150
+        && isValidFoodAliases(data.aliases)
+        && data.nameNormalized is string
+        && data.nameNormalized.size() >= 1
+        && data.nameNormalized.size() <= 200
+        && data.category in [
+          'rice_noodles',
+          'meat',
+          'fish_seafood',
+          'eggs_dairy',
+          'vegetables',
+          'fruits',
+          'legumes_nuts',
+          'soups',
+          'snacks',
+          'drinks',
+          'condiments'
+        ]
+        && isValidNutrientsMap(data.nutrientsPer100g)
+        && isValidServingUnits(data.servingUnits)
+        && isValidStringList(data.allergens, 20)
+        && data.allergensReviewed is bool
+        && isValidStringList(data.dietTags, 15)
+        && data.verificationStatus in ['verified', 'estimated', 'unverified']
+        && (
+          (data.verificationStatus == 'verified' && isValidVerifiedSource(data.source))
+          || (data.verificationStatus != 'verified' && isValidOptionalSource(data.source))
+        )
+        && (
+          data.imagePath == null
+          || (data.imagePath is string
+            && data.imagePath.size() >= 15
+            && data.imagePath.size() <= 250
+            && data.imagePath.matches('^/images/foods/[a-zA-Z0-9_\\-./]+$'))
+        )
+        && data.isActive is bool
+        && data.updatedBy is string
+        && data.updatedBy.size() >= 1
+        && data.updatedBy.size() <= 128
+        && data.updatedBy == request.auth.uid
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidFavorite(data, userId, foodId) {
+      return data.keys().hasAll(['userId', 'foodId', 'createdAt'])
+        && data.keys().hasOnly(['userId', 'foodId', 'createdAt'])
+        && data.userId is string
+        && data.userId == userId
+        && data.userId == request.auth.uid
+        && isValidId(data.foodId)
+        && data.foodId == foodId
+        && data.createdAt is timestamp;
+    }
+
+    // Stage 3: Goal, FoodDiaryDay & ShoppingList validation helpers
+    function isValidGoal(data, userId) {
+      return data.keys().hasAll([
+          'userId',
+          'goalType',
+          'startDate',
+          'startWeightKg',
+          'targetWeightKg',
+          'weeklyChangeKg',
+          'targetKcal',
+          'educationalConfirmed',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'userId',
+          'goalType',
+          'startDate',
+          'startWeightKg',
+          'targetWeightKg',
+          'weeklyChangeKg',
+          'targetKcal',
+          'educationalConfirmed',
+          'createdAt',
+          'updatedAt'
+        ])
+        && data.userId is string
+        && data.userId == userId
+        && data.userId == request.auth.uid
+        && data.goalType in ['maintain', 'lose_gradual', 'gain_gradual', 'healthy_habits']
+        && isValidDateKey(data.startDate)
+        && data.startWeightKg is number
+        && data.startWeightKg >= 20
+        && data.startWeightKg <= 300
+        && (data.targetWeightKg == null || (data.targetWeightKg is number && data.targetWeightKg >= 20 && data.targetWeightKg <= 300))
+        && data.weeklyChangeKg is number
+        && data.weeklyChangeKg >= 0
+        && data.weeklyChangeKg <= 0.5
+        && (
+          (data.goalType == 'healthy_habits' && data.targetKcal == null)
+          || (data.goalType != 'healthy_habits'
+            && data.targetKcal is number
+            && data.targetKcal >= 1200
+            && data.targetKcal <= 6000)
+        )
+        && data.educationalConfirmed == true
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidDiaryEntry(entry) {
+      return entry is map
+        && entry.keys().hasAll([
+          'id',
+          'mealType',
+          'source',
+          'foodId',
+          'name',
+          'grams',
+          'nutrientsPer100gSnapshot',
+          'verificationStatusSnapshot',
+          'loggedAt'
+        ])
+        && entry.keys().hasOnly([
+          'id',
+          'mealType',
+          'source',
+          'foodId',
+          'name',
+          'grams',
+          'nutrientsPer100gSnapshot',
+          'verificationStatusSnapshot',
+          'loggedAt'
+        ])
+        && entry.id is string
+        && entry.id.size() >= 1
+        && entry.id.size() <= 128
+        && entry.mealType in ['breakfast', 'lunch', 'dinner', 'snack']
+        && entry.source in ['database', 'custom']
+        && (
+          (entry.source == 'database' && isValidId(entry.foodId))
+          || (entry.source == 'custom' && entry.foodId == null)
+        )
+        && entry.name is string
+        && entry.name.size() >= 1
+        && entry.name.size() <= 150
+        && entry.grams is number
+        && entry.grams > 0
+        && entry.grams <= 5000
+        && isValidNutrientsMap(entry.nutrientsPer100gSnapshot)
+        && entry.verificationStatusSnapshot in ['verified', 'estimated', 'unverified']
+        && entry.loggedAt is string
+        && entry.loggedAt.size() >= 10
+        && entry.loggedAt.size() <= 40;
+    }
+
+    function isValidFoodDiaryDay(data, userId, dateKey) {
+      return data.keys().hasAll(['userId', 'date', 'entries', 'updatedAt'])
+        && data.keys().hasOnly(['userId', 'date', 'entries', 'updatedAt'])
+        && data.userId is string
+        && data.userId == userId
+        && data.userId == request.auth.uid
+        && data.date is string
+        && data.date == dateKey
+        && isValidDateKey(data.date)
+        && data.entries is list
+        && data.entries.size() <= 60
+        && (data.entries.size() == 0 || isValidDiaryEntry(data.entries[0]))
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidShoppingItem(item) {
+      return item is map
+        && item.keys().hasAll([
+          'id',
+          'name',
+          'category',
+          'quantityLabel',
+          'foodId',
+          'checked',
+          'addedAt'
+        ])
+        && item.keys().hasOnly([
+          'id',
+          'name',
+          'category',
+          'quantityLabel',
+          'foodId',
+          'checked',
+          'addedAt'
+        ])
+        && item.id is string
+        && item.id.size() >= 1
+        && item.id.size() <= 128
+        && item.name is string
+        && item.name.size() >= 1
+        && item.name.size() <= 150
+        && item.category in [
+          'rice_noodles',
+          'meat',
+          'fish_seafood',
+          'eggs_dairy',
+          'vegetables',
+          'fruits',
+          'legumes_nuts',
+          'soups',
+          'snacks',
+          'drinks',
+          'condiments',
+          'other'
+        ]
+        && item.quantityLabel is string
+        && item.quantityLabel.size() <= 60
+        && (item.foodId == null || isValidId(item.foodId))
+        && item.checked is bool
+        && item.addedAt is string
+        && item.addedAt.size() >= 10
+        && item.addedAt.size() <= 40;
+    }
+
+    function isValidShoppingList(data, userId) {
+      return data.keys().hasAll(['userId', 'items', 'updatedAt'])
+        && data.keys().hasOnly(['userId', 'items', 'updatedAt'])
+        && data.userId is string
+        && data.userId == userId
+        && data.userId == request.auth.uid
+        && data.items is list
+        && data.items.size() <= 100
+        && (data.items.size() == 0 || isValidShoppingItem(data.items[0]))
+        && data.updatedAt is timestamp;
+    }
+
+    // Stage 1 collections
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+      allow create: if isOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && incoming().consentAcceptedAt == request.time;
+      allow update: if isOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming(), userId)
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().consentAcceptedAt == existing().consentAcceptedAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'displayName',
+          'email',
+          'birthYear',
+          'sex',
+          'heightCm',
+          'weightKg',
+          'activityLevel',
+          'dietaryPreferences',
+          'allergens',
+          'consentAccepted',
+          'consentVersion',
+          'updatedAt'
+        ]);
+      allow delete: if isOwner(userId) && isValidId(userId);
+
+      match /health_records/{recordId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(recordId);
+        allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(recordId)
+          && isValidHealthRecord(incoming(), userId)
+          && incoming().createdAt == request.time
+          && get(/databases/$(database)/documents/users/$(userId)).data.consentAccepted == true;
+        allow update: if false;
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(recordId);
+      }
+
+      match /favorites/{foodId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(foodId);
+        allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && isValidId(foodId)
+          && isValidFavorite(incoming(), userId, foodId)
+          && incoming().createdAt == request.time;
+        allow update: if false;
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(foodId);
+      }
+
+      // Stage 3 user subcollections
+      match /goals/{goalId} {
+        allow get: if isOwner(userId) && isValidId(userId) && goalId == 'current';
+        allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && goalId == 'current'
+          && isValidGoal(incoming(), userId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time;
+        allow update: if isOwner(userId)
+          && isValidId(userId)
+          && goalId == 'current'
+          && isValidGoal(incoming(), userId)
+          && incoming().userId == existing().userId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'goalType',
+            'startDate',
+            'startWeightKg',
+            'targetWeightKg',
+            'weeklyChangeKg',
+            'targetKcal',
+            'educationalConfirmed',
+            'updatedAt'
+          ]);
+        allow delete: if isOwner(userId) && isValidId(userId) && goalId == 'current';
+      }
+
+      match /food_diaries/{dateKey} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidDateKey(dateKey);
+        allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && isValidDateKey(dateKey)
+          && isValidFoodDiaryDay(incoming(), userId, dateKey)
+          && incoming().updatedAt == request.time;
+        allow update: if isOwner(userId)
+          && isValidId(userId)
+          && isValidDateKey(dateKey)
+          && isValidFoodDiaryDay(incoming(), userId, dateKey)
+          && incoming().userId == existing().userId
+          && incoming().date == existing().date
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['entries', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidDateKey(dateKey);
+      }
+
+      match /shopping_list/{listId} {
+        allow get: if isOwner(userId) && isValidId(userId) && listId == 'current';
+        allow list: if isOwner(userId) && resource.data.userId == request.auth.uid;
+        allow create: if isOwner(userId)
+          && isValidId(userId)
+          && listId == 'current'
+          && isValidShoppingList(incoming(), userId)
+          && incoming().updatedAt == request.time;
+        allow update: if isOwner(userId)
+          && isValidId(userId)
+          && listId == 'current'
+          && isValidShoppingList(incoming(), userId)
+          && incoming().userId == existing().userId
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['items', 'updatedAt']);
+        allow delete: if isOwner(userId) && isValidId(userId) && listId == 'current';
+      }
+    }
+
+    // Stage 2 global food collection (public educational read; admin-only write)
+    match /foods/{foodId} {
+      allow get: if isValidId(foodId);
+      allow list: if resource.data.isActive == true || isAdmin();
+      allow create: if isAdmin()
+        && isValidId(foodId)
+        && isValidFood(incoming(), foodId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isAdmin()
+        && isValidId(foodId)
+        && isValidFood(incoming(), foodId)
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time;
+      allow delete: if isAdmin() && isValidId(foodId);
+    }
+  }
+}
