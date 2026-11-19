@@ -79,7 +79,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const currentTitle = location.pathname.startsWith('/foods/')
     ? 'Chi tiết thực phẩm'
-    : (ROUTE_TITLES[location.pathname] ?? 'Dinh dưỡng Việt');
+    : (ROUTE_TITLES[location.pathname] ?? 'BMI & AI Vietnamese Meal Planner');
 
   const handleSignOut = async () => {
     await signOutUser();
@@ -91,15 +91,15 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-[#F8FAF9] text-slate-900 flex flex-col lg:flex-row">
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex lg:w-64 lg:shrink-0 lg:flex-col border-r border-slate-200 bg-white">
-        <div className="flex h-16 items-center gap-2.5 border-b border-slate-200 px-6">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-forest-800 text-white">
+        <div className="flex h-16 items-center gap-2.5 border-b border-slate-200 px-5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-forest-800 text-white">
             <Activity className="h-4 w-4" aria-hidden="true" />
           </div>
           <Link
             to="/"
-            className="text-sm font-bold tracking-tight text-forest-900 whitespace-nowrap shrink-0"
+            className="text-[13px] font-bold leading-tight tracking-tight text-forest-900"
           >
-            VitaMeal AI · Việt Nam
+            BMI &amp; AI Vietnamese Meal Planner
           </Link>
         </div>
 
@@ -201,9 +201,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="flex items-center gap-2 min-w-0">
               <Link
                 to="/"
-                className="text-sm font-bold text-forest-900 whitespace-nowrap lg:hidden"
+                className="truncate max-w-[180px] sm:max-w-none text-xs sm:text-sm font-bold text-forest-900 lg:hidden"
               >
-                VitaMeal AI
+                BMI &amp; AI Vietnamese Meal Planner
               </Link>
               <span className="text-slate-300 lg:hidden" aria-hidden="true">
                 /
@@ -246,10 +246,15 @@ export function AppShell({ children }: { children: ReactNode }) {
               aria-hidden="true"
             />
             <div className="relative z-10 flex w-72 max-w-[85vw] flex-col bg-white border-r border-slate-200 shadow-xl">
-              <div className="flex h-16 items-center justify-between border-b border-slate-200 px-5">
-                <span className="text-sm font-bold text-forest-900">
-                  VitaMeal AI · Việt Nam
-                </span>
+              <div className="flex h-16 items-center justify-between gap-2 border-b border-slate-200 px-5">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-forest-800 text-white">
+                    <Activity className="h-4 w-4" aria-hidden="true" />
+                  </div>
+                  <span className="text-[13px] font-bold leading-tight text-forest-900">
+                    BMI &amp; AI Vietnamese Meal Planner
+                  </span>
+                </div>
                 <button
                   type="button"
                   onClick={() => setMobileMenuOpen(false)}
@@ -335,8 +340,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <footer className="hidden lg:block border-t border-slate-200 bg-white px-8 py-4 text-xs text-slate-500">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
             <span>
-              VitaMeal AI · BMI &amp; AI Vietnamese Meal Planner · Công cụ học tập dinh
-              dưỡng Việt Nam
+              BMI &amp; AI Vietnamese Meal Planner · Công cụ giáo dục dinh dưỡng Việt Nam
             </span>
             <span>Đơn vị chuẩn: cm · kg · kcal</span>
           </div>

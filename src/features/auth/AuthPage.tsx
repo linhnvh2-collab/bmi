@@ -8,7 +8,7 @@ import {
   updateProfile,
 } from 'firebase/auth';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { LogIn, UserPlus } from 'lucide-react';
+import { Activity, LogIn, UserPlus } from 'lucide-react';
 import { useAuth } from '@/src/app/providers/AuthProvider';
 import {
   Alert,
@@ -105,12 +105,22 @@ export function AuthPage() {
 
   return (
     <div className="mx-auto max-w-md space-y-6 py-4">
-      <div className="space-y-2 text-center">
+      <div className="space-y-2.5 text-center">
+        <div className="inline-flex items-center justify-center gap-2.5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-forest-800 text-white">
+            <Activity className="h-4 w-4" aria-hidden="true" />
+          </div>
+          <span className="text-sm font-bold tracking-tight text-forest-900">
+            BMI &amp; AI Vietnamese Meal Planner
+          </span>
+        </div>
         <h1 className="text-2xl font-bold text-slate-900">
           {activeTab === 'login' ? 'Đăng nhập tài khoản' : 'Tạo tài khoản mới'}
         </h1>
         <p className="text-sm text-slate-600">
-          Đăng nhập để lưu lịch sử chỉ số BMI và quản lý hồ sơ dinh dưỡng của bạn.
+          {activeTab === 'login'
+            ? 'Đăng nhập vào BMI & AI Vietnamese Meal Planner để lưu lịch sử chỉ số BMI và quản lý hồ sơ dinh dưỡng của bạn.'
+            : 'Đăng ký tài khoản BMI & AI Vietnamese Meal Planner để lưu hồ sơ dinh dưỡng, thực đơn AI và nhật ký ăn uống.'}
         </p>
       </div>
 

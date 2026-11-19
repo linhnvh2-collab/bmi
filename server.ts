@@ -268,7 +268,7 @@ async function createApp() {
       const activeSlots = getActiveSlotMetas(input.mealsPerDay);
       const compactCatalog = buildCompactCatalogForPrompt(safeCatalog);
 
-      const systemInstruction = `Bạn là chuyên gia giáo dục dinh dưỡng Việt Nam của ứng dụng VitaMeal AI.
+      const systemInstruction = `Bạn là chuyên gia giáo dục dinh dưỡng Việt Nam của ứng dụng BMI & AI Vietnamese Meal Planner.
 NHIỆM VỤ: Lập thực đơn ăn uống Việt Nam lành mạnh, đa dạng trong ${input.durationDays} ngày từ DANH SÁCH MÓN ĐƯỢC CUNG CẤP.
 QUY TẮC BẮT BUỘC:
 1. CHỈ được chọn foodId có mặt chính xác trong danh sách JSON catalog bên dưới. Tuyệt đối KHÔNG tự bịa foodId mới hoặc tự tính calo.
@@ -1161,7 +1161,7 @@ Danh sách catalog tham chiếu: ${JSON.stringify(catalogRefList)}`;
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(
-      `VitaMeal AI server running on http://0.0.0.0:${PORT} (model: ${GEMINI_MODEL})`
+      `BMI & AI Vietnamese Meal Planner server running on http://0.0.0.0:${PORT} (model: ${GEMINI_MODEL})`
     );
   });
 }

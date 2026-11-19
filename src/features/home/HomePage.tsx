@@ -50,7 +50,7 @@ export function HomePage() {
         <Card padding="lg" className="lg:col-span-7 flex flex-col justify-between gap-6">
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-forest-800">
-              <span>Giáo dục dinh dưỡng Việt Nam</span>
+              <span>BMI &amp; AI Vietnamese Meal Planner</span>
               <span aria-hidden="true" className="text-slate-300">
                 ·
               </span>
@@ -58,7 +58,7 @@ export function HomePage() {
               <span aria-hidden="true" className="text-slate-300">
                 ·
               </span>
-              <span>Giai đoạn 1</span>
+              <span>Giáo dục dinh dưỡng Việt Nam</span>
             </div>
 
             <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl leading-[1.2]">
